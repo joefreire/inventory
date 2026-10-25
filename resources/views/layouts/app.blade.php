@@ -125,6 +125,14 @@
                 <a href="{{ route('items.create') }}" class="btn btn-success">
                     <i class="bi bi-plus-lg me-1"></i>Adicionar
                 </a>
+                @auth
+                    <form action="{{ route('logout') }}" method="POST" class="ms-2">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-light" title="Sair">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </form>
+                @endauth
             </div>
         </div>
     </nav>
