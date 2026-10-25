@@ -74,7 +74,7 @@ return [
     'generic_tags' => [
         'componente', 'componentes', 'eletrica', 'eletrico', 'eletronica', 'eletronico',
         'eletronicos', 'hardware', 'peca', 'pecas', 'item', 'diy', 'maker', 'projeto',
-        'projetos', 'geral', 'outro', 'outros',
+        'projetos', 'geral', 'outro', 'outros', 'modulo', 'modulos', 'dc', 'placa', 'controle',
     ],
 
     // No maximo quantas tags a IA sugere por peca (existentes + novas).

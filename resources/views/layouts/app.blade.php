@@ -203,6 +203,20 @@
         });
     }
 
+    // Um toque so: trava os botoes de envio depois do primeiro (evita peca gravada duas vezes)
+    document.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) return;
+        const form = e.target;
+        if (form.dataset.enviando) { e.preventDefault(); return; }
+        form.dataset.enviando = '1';
+        document.querySelectorAll('button[type="submit"]').forEach(function (b) {
+            if (b.form === form) {
+                setTimeout(function () { b.disabled = true; }, 0);
+                if (b === e.submitter) b.insertAdjacentHTML('afterbegin', '<span class="spinner-border spinner-border-sm"></span>');
+            }
+        });
+    });
+
     @if(session('success'))
         window.toast(@json(session('success')));
     @endif
