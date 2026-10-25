@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $description
  * @property string|null $path
  * @property int $depth
+ * @property string|null $nfc_code
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  *
@@ -44,6 +45,7 @@ class Location extends Model
         'description',
         'path',
         'depth',
+        'nfc_code',
     ];
 
     /**
@@ -56,6 +58,10 @@ class Location extends Model
      */
     protected static function booted(): void
     {
+        static::creating(function (Location $location) {
+            $location->nfc_code ??= self::newNfcCode();
+        });
+
         static::saving(function (Location $location) {
             $location->updatePath();
         });
@@ -178,5 +184,34 @@ class Location extends Model
         }
 
         return $count;
+    }
+
+    /**
+     * Codigo curto e unico para a tag NFC (sem letras que confundem: 0/o, 1/l).
+     *
+     * @return string
+     */
+    public static function newNfcCode(): string
+    {
+        do {
+            $code = substr(str_shuffle(str_repeat('23456789abcdefghjkmnpqrstuvwxyz', 4)), 0, 8);
+        } while (self::where('nfc_code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Link gravado na tag NFC: NFC_BASE_URL/n/{codigo}. Sem NFC_BASE_URL, usa
+     * o endereco atual (so para teste: a tag gravada nao muda depois).
+     *
+     * @return string
+     */
+    public function getNfcUrlAttribute(): string
+    {
+        $base = config('app.nfc_base_url');
+
+        return $base
+            ? rtrim($base, '/') . '/n/' . $this->nfc_code
+            : route('nfc.open', $this->nfc_code);
     }
 }

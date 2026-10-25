@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
+use App\Models\Item;
 use App\Models\Location;
 use App\Services\LocationService;
 use Illuminate\Http\JsonResponse;
@@ -89,7 +90,14 @@ class LocationController extends Controller
             ->latest()
             ->paginate(24);
 
-        return view('locations.show', compact('location', 'items'));
+        // Para "Guardar item aqui" (iPhone: a tag abre esta pagina)
+        $otherItems = Item::where(fn ($q) => $q->whereNull('location_id')->orWhere('location_id', '!=', $location->id))
+            ->with('location')
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name', 'location_id']);
+
+        return view('locations.show', compact('location', 'items', 'otherItems'));
     }
 
     /**

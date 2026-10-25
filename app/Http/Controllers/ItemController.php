@@ -8,7 +8,9 @@ use App\Models\Item;
 use App\Models\Location;
 use App\Models\Tag;
 use App\Services\ItemService;
-use App\Services\OpenAIVisionService;
+use App\Services\Ai\AiException;
+use App\Services\Ai\ItemAdvisor;
+use App\Services\Ai\NaturalSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,12 +78,13 @@ class ItemController extends Controller
      *
      * @return View
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $locations = Location::orderBy('path')->get();
         $tags = Tag::orderBy('name')->get();
+        $locationId = $request->integer('location_id') ?: null;
 
-        return view('items.create', compact('locations', 'tags'));
+        return view('items.create', compact('locations', 'tags', 'locationId'));
     }
 
     /**
@@ -169,33 +172,61 @@ class ItemController extends Controller
     }
 
     /**
-     * Analyze an uploaded photo using AI vision service.
+     * Sugere o cadastro pela foto e/ou pelo que ja foi digitado: nome,
+     * descricao, specs, categoria, tags, caixa e se a peca ja existe.
      *
      * @param Request $request
-     * @param OpenAIVisionService $visionService
+     * @param ItemAdvisor $advisor
      * @return JsonResponse
      */
-    public function analyze(Request $request, OpenAIVisionService $visionService): JsonResponse
+    public function analyze(Request $request, ItemAdvisor $advisor): JsonResponse
     {
         $request->validate([
-            'photo' => 'required|image|max:10240',
+            'photo' => 'nullable|required_without:name|image|max:10240',
+            'name' => 'nullable|required_without:photo|string|max:255',
+            'description' => 'nullable|string|max:1000',
         ]);
 
         try {
-            $result = $visionService->analyzeUploadedFile($request->file('photo'));
-
-            return response()->json([
-                'success' => true,
-                'data' => $result,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error analyzing image', ['error' => $e->getMessage()]);
+            $result = $advisor->analyze(
+                $request->file('photo')?->getRealPath(),
+                $request->only('name', 'description')
+            );
+        } catch (AiException $e) {
+            Log::warning('IA: falha ao analisar item', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao analisar imagem: ' . $e->getMessage(),
-            ], 500);
+                'message' => 'A IA nao respondeu: ' . $e->getMessage(),
+            ], 502);
         }
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    /**
+     * Busca em linguagem natural ("tenho algo pra medir temperatura?").
+     *
+     * @param Request $request
+     * @param NaturalSearch $search
+     * @return View
+     */
+    public function ask(Request $request, NaturalSearch $search): View
+    {
+        $pergunta = trim((string) $request->query('q', ''));
+        $results = collect();
+        $error = null;
+
+        if ($pergunta !== '') {
+            try {
+                $results = $search->search($pergunta);
+            } catch (AiException $e) {
+                Log::warning('IA: falha na busca', ['error' => $e->getMessage()]);
+                $error = 'A IA nao respondeu: ' . $e->getMessage();
+            }
+        }
+
+        return view('items.ask', compact('pergunta', 'results', 'error'));
     }
 
     /**

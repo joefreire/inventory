@@ -55,6 +55,13 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Endereco fixo gravado nas tags NFC das caixas (ex.: https://inventario.exemplo).
+    | A tag nao muda depois de gravada: definir antes de gravar a primeira.
+    | Vazio = endereco pelo qual a pagina foi aberta (so serve para teste).
+    */
+    'nfc_base_url' => env('NFC_BASE_URL'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

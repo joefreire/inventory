@@ -32,19 +32,18 @@
                                 </div>
                             </div>
 
-                            <!-- Botao de analise IA -->
+                            <!-- IA: foto e/ou nome digitado -> sugestoes -->
                             <div class="mt-2">
-                                <button type="button" class="btn btn-outline-primary" id="analyzeBtn" disabled>
-                                    <i class="bi bi-robot me-1"></i>Identificar com IA
+                                <button type="button" class="btn btn-outline-primary" id="analyzeBtn">
+                                    <i class="bi bi-robot me-1"></i>Sugerir com IA
                                 </button>
+                                <small class="text-muted ms-2">Com foto ou so com o nome digitado</small>
                                 <div class="ai-loading mt-2" id="aiLoading">
                                     <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                                    <span class="text-muted">Analisando imagem...</span>
+                                    <span class="text-muted">Identificando e decidindo...</span>
                                 </div>
-                                <div class="alert alert-info mt-2 d-none" id="aiResult">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    <span id="aiResultText"></span>
-                                </div>
+                                <div class="alert alert-warning mt-2 d-none" id="aiDuplicate"></div>
+                                <div class="alert alert-info mt-2 d-none" id="aiResult"></div>
                             </div>
                         </div>
 
@@ -120,7 +119,7 @@
                                     id="location_id" name="location_id">
                                 <option value="">Selecione um local...</option>
                                 @foreach($locations as $location)
-                                    <option value="{{ $location->id }}" {{ old('location_id') == $location->id ? 'selected' : '' }}>
+                                    <option value="{{ $location->id }}" {{ old('location_id', $locationId) == $location->id ? 'selected' : '' }}>
                                         {{ $location->path }}
                                     </option>
                                 @endforeach
@@ -194,7 +193,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const aiLoading = document.getElementById('aiLoading');
     const aiResult = document.getElementById('aiResult');
-    const aiResultText = document.getElementById('aiResultText');
 
     // Click no upload zone
     uploadZone.addEventListener('click', function(e) {
@@ -240,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
             previewImg.src = e.target.result;
             uploadPlaceholder.classList.add('d-none');
             imagePreview.classList.remove('d-none');
-            analyzeBtn.disabled = false;
         };
         reader.readAsDataURL(file);
     }
@@ -251,20 +248,30 @@ document.addEventListener('DOMContentLoaded', function() {
         photoInput.value = '';
         uploadPlaceholder.classList.remove('d-none');
         imagePreview.classList.add('d-none');
-        analyzeBtn.disabled = true;
         aiResult.classList.add('d-none');
     });
 
-    // Analyze with AI
+    // IA: uma chamada; o servidor usa o modelo de visao (se houver foto) e o de decisao
+    const pct = p => p == null ? '' : ` (${Math.round(p * 100)}%)`;
+    const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
     analyzeBtn.addEventListener('click', async function() {
-        if (!photoInput.files.length) return;
+        const nameInput = document.getElementById('name');
+        if (!photoInput.files.length && !nameInput.value.trim()) {
+            showAi('warning', 'Tire uma foto ou digite o nome da peca primeiro.');
+            return;
+        }
 
         const formData = new FormData();
-        formData.append('photo', photoInput.files[0]);
+        if (photoInput.files.length) formData.append('photo', photoInput.files[0]);
+        if (nameInput.value.trim()) formData.append('name', nameInput.value.trim());
+        const desc = document.getElementById('description').value.trim();
+        if (desc) formData.append('description', desc);
 
         aiLoading.classList.add('active');
         analyzeBtn.disabled = true;
         aiResult.classList.add('d-none');
+        document.getElementById('aiDuplicate').classList.add('d-none');
 
         try {
             const response = await fetch('{{ route('items.analyze') }}', {
@@ -275,53 +282,75 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: formData
             });
-
             const result = await response.json();
 
-            if (result.success && result.data) {
-                const data = result.data;
-
-                // Preencher campos
-                if (data.name && !document.getElementById('name').value) {
-                    document.getElementById('name').value = data.name;
-                }
-                if (data.description && !document.getElementById('description').value) {
-                    document.getElementById('description').value = data.description;
-                }
-                if (data.category && !document.getElementById('category').value) {
-                    document.getElementById('category').value = data.category;
-                }
-                if (data.suggested_tags && data.suggested_tags.length > 0) {
-                    const currentTags = document.getElementById('tags').value;
-                    const newTags = data.suggested_tags.join(', ');
-                    document.getElementById('tags').value = currentTags ? currentTags + ', ' + newTags : newTags;
-                }
-
-                // Salvar dados da IA
-                document.getElementById('ai_description').value = data.description || '';
-                document.getElementById('ai_metadata').value = JSON.stringify(data.specs || {});
-
-                // Mostrar resultado
-                const confidence = Math.round((data.confidence || 0) * 100);
-                aiResultText.textContent = `Identificado: ${data.name} (${confidence}% confianca)`;
-                aiResult.classList.remove('d-none');
-            } else {
-                aiResultText.textContent = result.message || 'Nao foi possivel identificar o item.';
-                aiResult.classList.remove('d-none');
-                aiResult.classList.remove('alert-info');
-                aiResult.classList.add('alert-warning');
+            if (!result.success) {
+                showAi('danger', result.message || 'Nao foi possivel identificar a peca.');
+                return;
             }
+            applySuggestion(result.data);
         } catch (error) {
             console.error('Erro ao analisar:', error);
-            aiResultText.textContent = 'Erro ao conectar com a IA. Tente novamente.';
-            aiResult.classList.remove('d-none');
-            aiResult.classList.remove('alert-info');
-            aiResult.classList.add('alert-danger');
+            showAi('danger', 'Erro ao conectar com a IA. Tente novamente.');
         } finally {
             aiLoading.classList.remove('active');
             analyzeBtn.disabled = false;
         }
     });
+
+    function showAi(kind, html) {
+        aiResult.className = `alert alert-${kind} mt-2`;
+        aiResult.innerHTML = html;
+    }
+
+    function applySuggestion(data) {
+        const setIfEmpty = (id, value) => {
+            const el = document.getElementById(id);
+            if (value && !el.value.trim()) el.value = value;
+        };
+        setIfEmpty('name', data.name);
+        setIfEmpty('description', data.description);
+        if (data.category) setIfEmpty('category', data.category.value);
+
+        const tagNames = (data.tags || []).map(t => t.name);
+        tagNames.forEach(addTag);
+
+        document.getElementById('ai_description').value = data.description || '';
+        document.getElementById('ai_metadata').value = JSON.stringify({
+            specs: data.specs || {},
+            visible_text: data.visible_text || '',
+            models: data.models || {},
+        });
+
+        const linhas = [];
+        if (data.category) linhas.push(`<b>Categoria:</b> ${esc(data.category.label || data.category.value)}${pct(data.category.probability)}`);
+        if (tagNames.length) {
+            linhas.push('<b>Tags:</b> ' + data.tags.map(t => esc(t.name) + (t.existing ? pct(t.probability) : ' (nova)')).join(', '));
+        }
+        const specs = Object.entries(data.specs || {});
+        if (specs.length) linhas.push('<b>Specs:</b> ' + specs.map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(', '));
+
+        const loc = data.location;
+        const select = document.getElementById('location_id');
+        if (loc && loc.suggested) {
+            if (!select.value) select.value = String(loc.suggested.id);
+            linhas.push(`<b>Guardar em:</b> ${esc(loc.suggested.path)}${pct(loc.suggested.probability)}`);
+        } else if (loc && loc.options && loc.options.length) {
+            linhas.push('<b>Nenhuma caixa combina bem.</b> Mais perto: ' + loc.options.map(o => esc(o.path) + pct(o.probability)).join(', '));
+        }
+        if (data.models) linhas.push(`<small class="text-muted">Modelos: ${esc(data.models.vision || 'sem foto')} + ${esc(data.models.decision)}</small>`);
+        showAi('info', linhas.join('<br>'));
+
+        const dup = data.duplicate;
+        const dupBox = document.getElementById('aiDuplicate');
+        if (dup) {
+            dupBox.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i><b>Voce ja tem isso?</b> `
+                + `<a href="${esc(dup.url)}" target="_blank">${esc(dup.name)}</a> (${esc(dup.quantity)} un.`
+                + `${dup.location ? ', em ' + esc(dup.location) : ''})${pct(dup.probability)}. `
+                + 'Se for a mesma peca, abra o item e aumente a quantidade.';
+            dupBox.classList.remove('d-none');
+        }
+    }
 });
 
 function addTag(tagName) {

@@ -1,0 +1,206 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Item;
+use App\Models\Location;
+use App\Models\Tag;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class AiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'ai.ollama.api_key' => 'test-key',
+            'ai.ollama.base_url' => 'https://ollama.test',
+            'ai.models.vision' => ['visao-a', 'visao-b'],
+            'ai.models.decision' => 'clef',
+        ]);
+    }
+
+    private function chatResponse(array $data): array
+    {
+        return ['message' => ['role' => 'assistant', 'content' => json_encode($data)]];
+    }
+
+    public function test_analyze_with_photo_uses_vision_then_decision(): void
+    {
+        $caixa = Location::create(['name' => 'Caixa sensores']);
+        Location::create(['name' => 'Gaveta resistores']);
+        $existente = Item::create(['name' => 'Sensor DS18B20', 'location_id' => $caixa->id, 'quantity' => 4]);
+        $tag = Tag::create(['name' => 'sensor']);
+
+        Http::fake([
+            'ollama.test/api/chat' => Http::response($this->chatResponse([
+                'name' => 'Sensor de temperatura DS18B20',
+                'description' => 'Sensor digital 1-wire',
+                'specs' => ['tensao' => '3-5V', 'vazio' => ''],
+                'visible_text' => 'DALLAS 18B20',
+                'tags' => ['Sensor', 'temperatura'],
+            ])),
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'categoria' => ['type' => 'choice', 'choice' => 'sensor', 'probabilities' => ['sensor' => 0.97]],
+                "tag_{$tag->id}" => ['type' => 'noul', 'noul' => 0.95],
+                'local' => ['type' => 'choice', 'choice' => "l{$caixa->id}", 'probabilities' => ["l{$caixa->id}" => 0.9, 'nenhum' => 0.05]],
+                'duplicado' => ['type' => 'choice', 'choice' => "i{$existente->id}", 'probabilities' => ["i{$existente->id}" => 0.88]],
+            ]]),
+        ]);
+
+        $response = $this->postJson(route('items.analyze'), [
+            'photo' => UploadedFile::fake()->image('peca.jpg'),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.name', 'Sensor de temperatura DS18B20')
+            ->assertJsonPath('data.specs', ['tensao' => '3-5V'])
+            ->assertJsonPath('data.category.value', 'sensor')
+            ->assertJsonPath('data.location.suggested.id', $caixa->id)
+            ->assertJsonPath('data.duplicate.id', $existente->id)
+            ->assertJsonPath('data.models.vision', 'visao-a');
+
+        // tag existente aprovada + so a sugestao que nao existe ("Sensor" = "sensor")
+        $this->assertSame(
+            [['sensor', true], ['temperatura', false]],
+            array_map(fn ($t) => [$t['name'], $t['existing']], $response->json('data.tags'))
+        );
+
+        Http::assertSent(function (Request $request) {
+            if (!str_ends_with($request->url(), '/v1/systemone')) {
+                return false;
+            }
+
+            return $request['model'] === 'clef'
+                && count($request['images']) === 1
+                && isset($request['questions']['categoria'], $request['questions']['local'], $request['questions']['duplicado'])
+                && $request->hasHeader('Authorization', 'Bearer test-key');
+        });
+    }
+
+    public function test_vision_falls_back_to_next_model(): void
+    {
+        Http::fake([
+            'ollama.test/api/chat' => function (Request $request) {
+                return $request['model'] === 'visao-a'
+                    ? Http::response(['error' => 'rate limited'], 429)
+                    : Http::response($this->chatResponse(['name' => 'Rele 5V']));
+            },
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'categoria' => ['type' => 'choice', 'choice' => 'rele', 'probabilities' => ['rele' => 0.8]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('rele.jpg')])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Rele 5V')
+            ->assertJsonPath('data.models.vision', 'visao-b')
+            ->assertJsonPath('data.duplicate', null)
+            ->assertJsonPath('data.location', null);
+    }
+
+    public function test_analyze_without_photo_uses_typed_name_and_skips_vision(): void
+    {
+        Http::fake([
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'categoria' => ['type' => 'choice', 'choice' => 'resistor', 'probabilities' => ['resistor' => 0.99]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Resistor 10k'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Resistor 10k')
+            ->assertJsonPath('data.models.vision', null);
+
+        Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/api/chat'));
+    }
+
+    public function test_low_probability_duplicate_and_location_are_not_suggested(): void
+    {
+        $caixa = Location::create(['name' => 'Caixa']);
+        $item = Item::create(['name' => 'Outra coisa', 'location_id' => $caixa->id]);
+
+        Http::fake([
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'local' => ['type' => 'choice', 'choice' => "l{$caixa->id}", 'probabilities' => ["l{$caixa->id}" => 0.3, 'nenhum' => 0.7]],
+                'duplicado' => ['type' => 'choice', 'choice' => "i{$item->id}", 'probabilities' => ["i{$item->id}" => 0.4]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Motor de passo'])
+            ->assertOk()
+            ->assertJsonPath('data.duplicate', null)
+            ->assertJsonPath('data.location.suggested', null)
+            ->assertJsonPath('data.location.options.0.id', $caixa->id);
+    }
+
+    public function test_analyze_requires_photo_or_name(): void
+    {
+        $this->postJson(route('items.analyze'), [])->assertStatus(422);
+    }
+
+    public function test_analyze_reports_missing_key(): void
+    {
+        config(['ai.ollama.api_key' => null]);
+        Http::fake();
+
+        $this->postJson(route('items.analyze'), ['name' => 'Resistor'])
+            ->assertStatus(502)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_analyze_reports_when_every_vision_model_fails(): void
+    {
+        Http::fake(['ollama.test/api/chat' => Http::response('erro', 500)]);
+
+        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('x.jpg')])
+            ->assertStatus(502)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_natural_search_ranks_items_and_splits_in_batches(): void
+    {
+        $items = collect(range(1, 70))->map(fn ($i) => Item::create(['name' => "Item {$i}"]));
+        $sensor = $items[10];
+        $outro = $items[65];
+
+        Http::fake(function (Request $request) use ($sensor, $outro) {
+            $answers = [];
+            foreach (array_keys($request['questions']) as $id) {
+                $p = match ($id) {
+                    "i{$sensor->id}" => 0.9,
+                    "i{$outro->id}" => 0.6,
+                    default => 0.1,
+                };
+                $answers[$id] = ['type' => 'noul', 'noul' => $p];
+            }
+
+            return Http::response(['answers' => $answers]);
+        });
+
+        $response = $this->get(route('items.ask', ['q' => 'medir temperatura']));
+
+        $response->assertOk();
+        $this->assertSame(
+            [$sensor->id, $outro->id],
+            $response->viewData('results')->map(fn ($r) => $r['item']->id)->all()
+        );
+        Http::assertSentCount(2); // 70 perguntas = 64 + 6
+    }
+
+    public function test_ask_page_without_question_does_not_call_ai(): void
+    {
+        Http::fake();
+
+        $this->get(route('items.ask'))->assertOk()->assertSee('Perguntar ao inventario');
+
+        Http::assertNothingSent();
+    }
+}

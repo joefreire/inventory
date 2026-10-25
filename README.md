@@ -1,11 +1,12 @@
 # Inventory Management System
 
-A Laravel-based inventory management system with AI-powered image recognition for electronic components and technical parts.
+Inventario pessoal de componentes eletronicos e pecas, com IA (Ollama Cloud) e tags NFC nas caixas.
 
 ## Features
 
 - **Item Management**: Create, edit, delete, and search inventory items
-- **AI Image Recognition**: Automatically identify electronic components using OpenAI Vision API
+- **IA (Ollama Cloud)**: foto -> cadastro sugerido, caixa sugerida, "ja tenho isso?" e busca em linguagem natural
+- **Tags NFC**: cada caixa tem um link fixo `/n/{codigo}`; encostar o celular abre a caixa
 - **Hierarchical Locations**: Organize items in a tree structure (rooms, shelves, drawers)
 - **Flexible Tagging**: Categorize items with colored tags
 - **Photo Management**: Upload and manage item photos with automatic thumbnails
@@ -14,11 +15,11 @@ A Laravel-based inventory management system with AI-powered image recognition fo
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.4+ (o `vendor/` exige 8.4; na WSL use `php8.4`)
 - Composer
 - Node.js 18+ (for frontend assets)
 - SQLite or MySQL/PostgreSQL
-- OpenAI API key (for AI features)
+- Chave do Ollama Cloud (`OLLAMA_API_KEY`)
 
 ## Installation
 
@@ -84,15 +85,40 @@ Visit `http://localhost:8000` in your browser.
 
 ## Configuration
 
-### OpenAI API (Optional)
-
-To enable AI image recognition, add your OpenAI API key to `.env`:
+### IA (Ollama Cloud)
 
 ```env
-OPENAI_API_KEY=your-api-key-here
+OLLAMA_API_KEY=...                                  # https://ollama.com/settings/keys
+# AI_VISION_MODELS=gemma4:31b,kimi-k3,glm-5.3-flash   # leem a foto; em ordem, o seguinte entra se um falhar
+# AI_DECISION_MODEL=clef                              # modelo de decisao (/v1/systemone)
 ```
 
-The system uses GPT-4 Vision to identify electronic components from photos.
+Dois tipos de modelo (`app/Services/Ai/`):
+
+| Etapa | Modelo | O que faz |
+|---|---|---|
+| Ler a foto | `gemma4:31b` (reserva: `kimi-k3`, `glm-5.3-flash`) | Nome, descricao, specs, texto impresso na peca |
+| Decidir | `clef` | Uma chamada com perguntas fechadas: categoria, quais tags existentes servem, em qual caixa guardar, se a peca ja esta cadastrada |
+| Perguntar | `clef` | Cada item vira um sim/nao contra a pergunta ("tenho algo pra medir temperatura?") |
+
+O modelo de decisao devolve probabilidades, nao texto. Os limites para usar a
+decisao sem perguntar ficam em `config/ai.php` (`thresholds`). Medido em
+2026-10-25: foto -> sugestao completa em ~3 s; busca em ~0,6 s.
+
+### Tags NFC
+
+Cada caixa (local) ganha um codigo e o link `NFC_BASE_URL/n/{codigo}`.
+
+```env
+NFC_BASE_URL=https://inventario.exemplo   # endereco fixo: definir ANTES de gravar a primeira tag
+```
+
+- **Abrir a caixa:** encostar o celular na tag (Android e iPhone abrem o link sozinhos).
+- **Gravar a tag:** pagina da caixa > "Gravar na tag" (Chrome no Android, so em HTTPS).
+  No iPhone: "Copiar" o link e gravar no app NFC Tools (Gravar > Adicionar registro > URL).
+- **Guardar um item:** na pagina do item, "Guardar: encostar na caixa" (Android), ou
+  na pagina da caixa aberta pela tag, "Guardar item aqui" (qualquer celular).
+- Tags NTAG213/215 servem; o link tem ~40 caracteres.
 
 ### Media Storage
 
@@ -133,7 +159,10 @@ php artisan storage:link
 | GET | `/items/{id}` | View item details |
 | PUT | `/items/{id}` | Update item |
 | DELETE | `/items/{id}` | Delete item |
-| POST | `/items/analyze` | Analyze image with AI |
+| POST | `/items/analyze` | Sugestao da IA (foto e/ou nome) |
+| GET | `/items/ask?q=` | Busca em linguagem natural |
+| GET | `/n/{codigo}` | Link da tag NFC: abre a caixa |
+| POST | `/items/{id}/nfc-move` | Guarda o item na caixa da tag lida |
 | POST | `/items/{id}/move` | Move item to location |
 | GET | `/locations` | List all locations |
 | POST | `/locations` | Create new location |
@@ -146,9 +175,9 @@ See [docs/API.md](docs/API.md) for detailed API documentation.
 
 ## Testing
 
-Run PHPUnit tests:
+Run PHPUnit tests (a IA e simulada com `Http::fake`):
 ```bash
-php artisan test
+php8.4 artisan test
 ```
 
 Run Playwright E2E tests:

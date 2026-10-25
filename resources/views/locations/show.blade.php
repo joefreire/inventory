@@ -62,6 +62,64 @@
         </div>
     @endif
 
+    <!-- Tag NFC da caixa -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-broadcast me-2"></i>Tag NFC</div>
+                <div class="card-body">
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" class="form-control" id="nfcUrl" value="{{ $location->nfc_url }}" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="nfcCopyBtn">
+                            <i class="bi bi-clipboard"></i> Copiar
+                        </button>
+                    </div>
+                    @unless(config('app.nfc_base_url'))
+                        <div class="alert alert-warning py-1 px-2 small mb-2">
+                            NFC_BASE_URL nao definido: este link e so de teste. Defina o endereco fixo no .env antes de gravar tags.
+                        </div>
+                    @endunless
+                    <button type="button" class="btn btn-primary btn-sm d-none" id="nfcWriteBtn">
+                        <i class="bi bi-pencil-square me-1"></i>Gravar na tag
+                    </button>
+                    <div class="small mt-2" id="nfcStatus"></div>
+                    <div class="small text-muted mt-2" id="nfcHelp">
+                        Encostar o celular na tag abre esta caixa (Android e iPhone).
+                        <span id="nfcHelpNoWrite">Para gravar: no Android, abra esta pagina no Chrome com HTTPS e use
+                        "Gravar na tag"; no iPhone, copie o link e grave no app NFC Tools
+                        (Gravar &gt; Adicionar registro &gt; URL).</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-box-arrow-in-down me-2"></i>Guardar item aqui</div>
+                <div class="card-body">
+                    @if($otherItems->isNotEmpty())
+                        <div class="input-group input-group-sm">
+                            <select class="form-select" id="storeItemSelect">
+                                <option value="">Escolha um item...</option>
+                                @foreach($otherItems as $other)
+                                    <option value="{{ route('items.move', $other) }}">
+                                        {{ $other->name }}{{ $other->location ? ' (em ' . $other->location->path . ')' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <button class="btn btn-success" type="button" id="storeItemBtn">Guardar</button>
+                        </div>
+                        <div class="small mt-2" id="storeItemStatus"></div>
+                    @else
+                        <p class="text-muted small mb-0">Todos os itens ja estao aqui.</p>
+                    @endif
+                    <a href="{{ route('items.create', ['location_id' => $location->id]) }}" class="btn btn-link btn-sm px-0 mt-2">
+                        <i class="bi bi-camera me-1"></i>Cadastrar peca nova nesta caixa
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Itens neste local -->
     <h5 class="mb-3">
         <i class="bi bi-box me-2"></i>Itens neste local
@@ -142,3 +200,71 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const url = document.getElementById('nfcUrl').value;
+    const status = document.getElementById('nfcStatus');
+    const say = (kind, text) => { status.className = 'small mt-2 text-' + kind; status.textContent = text; };
+
+    document.getElementById('nfcCopyBtn').addEventListener('click', async function() {
+        try {
+            await navigator.clipboard.writeText(url);
+            say('success', 'Link copiado.');
+        } catch (e) {
+            document.getElementById('nfcUrl').select();
+            say('muted', 'Selecione e copie o link.');
+        }
+    });
+
+    if (window.nfc.supported) {
+        const btn = document.getElementById('nfcWriteBtn');
+        btn.classList.remove('d-none');
+        document.getElementById('nfcHelpNoWrite').classList.add('d-none');
+        btn.addEventListener('click', async function() {
+            btn.disabled = true;
+            say('muted', 'Encoste a tag vazia no celular...');
+            try {
+                await window.nfc.write(url);
+                say('success', 'Tag gravada. Encoste de novo para testar.');
+            } catch (e) {
+                say('danger', 'Nao gravou: ' + e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    }
+
+    const storeBtn = document.getElementById('storeItemBtn');
+    if (storeBtn) {
+        storeBtn.addEventListener('click', async function() {
+            const moveUrl = document.getElementById('storeItemSelect').value;
+            const out = document.getElementById('storeItemStatus');
+            if (!moveUrl) return;
+            storeBtn.disabled = true;
+            try {
+                const response = await fetch(moveUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ location_id: {{ $location->id }} }),
+                });
+                const result = await response.json();
+                out.className = 'small mt-2 text-' + (result.success ? 'success' : 'danger');
+                out.textContent = result.message || 'Erro ao guardar.';
+                if (result.success) setTimeout(() => location.reload(), 600);
+            } catch (e) {
+                out.className = 'small mt-2 text-danger';
+                out.textContent = 'Erro ao guardar.';
+            } finally {
+                storeBtn.disabled = false;
+            }
+        });
+    }
+});
+</script>
+@endpush

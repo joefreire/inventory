@@ -51,6 +51,20 @@
                 </div>
             </div>
 
+            <!-- Guardar por NFC (Android) -->
+            <div class="card mb-3">
+                <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+                    <span><i class="bi bi-geo-alt me-1"></i>{{ $item->location?->path ?? 'Sem local' }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto d-none" id="nfcMoveBtn">
+                        <i class="bi bi-broadcast me-1"></i>Guardar: encostar na caixa
+                    </button>
+                    <small class="text-muted w-100 d-none" id="nfcMoveHint">
+                        No iPhone: encoste o celular na tag da caixa e use "Guardar item aqui".
+                    </small>
+                    <div class="w-100 small d-none" id="nfcMoveStatus"></div>
+                </div>
+            </div>
+
             <!-- Quantidade -->
             @if($item->quantity > 1)
                 <div class="alert alert-info py-2">
@@ -170,3 +184,43 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('nfcMoveBtn');
+    const status = document.getElementById('nfcMoveStatus');
+    if (!window.nfc.supported) {
+        document.getElementById('nfcMoveHint').classList.remove('d-none');
+        return;
+    }
+    btn.classList.remove('d-none');
+    btn.addEventListener('click', async function() {
+        status.className = 'w-100 small text-muted';
+        status.textContent = 'Encoste o celular na tag da caixa...';
+        btn.disabled = true;
+        try {
+            const tag = await window.nfc.read();
+            const response = await fetch('{{ route('items.nfc-move', $item) }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ tag }),
+            });
+            const result = await response.json();
+            status.className = 'w-100 small ' + (result.success ? 'text-success' : 'text-danger');
+            status.textContent = result.message;
+            if (result.success) setTimeout(() => location.reload(), 800);
+        } catch (e) {
+            status.className = 'w-100 small text-danger';
+            status.textContent = e.message;
+        } finally {
+            btn.disabled = false;
+        }
+    });
+});
+</script>
+@endpush

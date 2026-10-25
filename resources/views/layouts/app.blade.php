@@ -93,8 +93,13 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('items.*') ? 'active' : '' }}" href="{{ route('items.index') }}">
+                        <a class="nav-link {{ request()->routeIs('items.*') && !request()->routeIs('items.ask') ? 'active' : '' }}" href="{{ route('items.index') }}">
                             <i class="bi bi-grid me-1"></i>Itens
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('items.ask') ? 'active' : '' }}" href="{{ route('items.ask') }}">
+                            <i class="bi bi-robot me-1"></i>Perguntar
                         </a>
                     </li>
                     <li class="nav-item">
@@ -158,6 +163,39 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+    <script>
+    // Tags NFC: Web NFC so existe no Chrome do Android e so em HTTPS (ou localhost).
+    // No iPhone a tag e lida pelo proprio sistema (abre o link) e gravada pelo app NFC Tools.
+    window.nfc = {
+        supported: 'NDEFReader' in window,
+        async write(url) {
+            const reader = new NDEFReader();
+            await reader.write({ records: [{ recordType: 'url', data: url }] });
+        },
+        read() {
+            return new Promise(async (resolve, reject) => {
+                const reader = new NDEFReader();
+                const ctrl = new AbortController();
+                reader.onreadingerror = () => { ctrl.abort(); reject(new Error('Nao consegui ler a tag. Encoste de novo.')); };
+                reader.onreading = event => {
+                    ctrl.abort();
+                    const decoder = new TextDecoder();
+                    for (const record of event.message.records) {
+                        if (record.recordType === 'url' || record.recordType === 'text') {
+                            return resolve(decoder.decode(record.data));
+                        }
+                    }
+                    reject(new Error('A tag esta vazia ou nao tem link.'));
+                };
+                try {
+                    await reader.scan({ signal: ctrl.signal });
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        },
+    };
+    </script>
     @stack('scripts')
 </body>
 </html>
