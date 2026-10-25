@@ -1,366 +1,182 @@
 @extends('layouts.app')
 
-@section('title', 'Novo Item')
+@section('title', 'Cadastrar peça')
+@section('back', route('items.index'))
+@section('body-class', 'has-dock')
 
 @section('content')
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Adicionar Novo Item</h5>
-                </div>
-                <div class="card-body">
-                    <form action="{{ route('items.store') }}" method="POST" enctype="multipart/form-data" id="itemForm">
-                        @csrf
+<div class="page">
+    <form action="{{ route('items.store') }}" method="POST" enctype="multipart/form-data" id="itemForm" novalidate>
+        @csrf
 
-                        <!-- Upload de foto -->
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Foto do Item</label>
-                            <div class="upload-zone" id="uploadZone">
-                                <input type="file" name="photo" id="photoInput" accept="image/*" capture="environment">
-                                <div id="uploadPlaceholder">
-                                    <i class="bi bi-camera fs-1 text-muted"></i>
-                                    <p class="mb-0 text-muted">Clique ou arraste uma foto aqui</p>
-                                    <small class="text-muted">JPG, PNG ou GIF ate 10MB</small>
-                                </div>
-                                <div id="imagePreview" class="d-none">
-                                    <img src="" alt="Preview" class="img-fluid rounded" style="max-height: 300px;">
-                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removePhoto">
-                                        <i class="bi bi-trash me-1"></i>Remover
-                                    </button>
-                                </div>
-                            </div>
+        {{-- Camera primeiro: a foto ja dispara a IA --}}
+        <label class="camera-zone mb-3" id="cameraZone" for="photoInput">
+            <input type="file" name="photo" id="photoInput" accept="image/*" capture="environment" class="d-none">
+            <span class="cam"><i class="bi bi-camera"></i></span>
+            <strong>Tirar foto da peça</strong>
+            <span class="small-muted px-4 text-center">A IA preenche o cadastro e sugere a caixa</span>
+        </label>
 
-                            <!-- IA: foto e/ou nome digitado -> sugestoes -->
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-outline-primary" id="analyzeBtn">
-                                    <i class="bi bi-robot me-1"></i>Sugerir com IA
-                                </button>
-                                <small class="text-muted ms-2">Com foto ou so com o nome digitado</small>
-                                <div class="ai-loading mt-2" id="aiLoading">
-                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                                    <span class="text-muted">Identificando e decidindo...</span>
-                                </div>
-                                <div class="alert alert-warning mt-2 d-none" id="aiDuplicate"></div>
-                                <div class="alert alert-info mt-2 d-none" id="aiResult"></div>
-                            </div>
-                        </div>
+        <div id="aiArea" class="mb-3"></div>
 
-                        <hr>
+        <input type="hidden" name="ai_description" id="ai_description" value="{{ old('ai_description') }}">
+        <input type="hidden" name="ai_metadata" id="ai_metadata" value="{{ old('ai_metadata') }}">
 
-                        <!-- Nome -->
-                        <div class="mb-3">
-                            <label for="name" class="form-label fw-bold">Nome *</label>
-                            <input type="text" class="form-control @error('name') is-invalid @enderror"
-                                   id="name" name="name" value="{{ old('name') }}" required>
-                            @error('name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+        @include('items._fields')
 
-                        <!-- Descricao -->
-                        <div class="mb-3">
-                            <label for="description" class="form-label">Descricao</label>
-                            <textarea class="form-control @error('description') is-invalid @enderror"
-                                      id="description" name="description" rows="2">{{ old('description') }}</textarea>
-                            @error('description')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+        <button type="button" class="btn btn-quiet w-100 mb-3" id="suggestFromName">
+            <i class="bi bi-stars"></i> Sugerir pelo nome, sem foto
+        </button>
+    </form>
+</div>
 
-                        <!-- Descricao da IA (hidden, preenchido automaticamente) -->
-                        <input type="hidden" name="ai_description" id="ai_description" value="{{ old('ai_description') }}">
-                        <input type="hidden" name="ai_metadata" id="ai_metadata" value="{{ old('ai_metadata') }}">
-
-                        <div class="row">
-                            <!-- Categoria -->
-                            <div class="col-md-6 mb-3">
-                                <label for="category" class="form-label">Categoria</label>
-                                <input type="text" class="form-control @error('category') is-invalid @enderror"
-                                       id="category" name="category" value="{{ old('category') }}"
-                                       list="categoryList" placeholder="Ex: capacitor, resistor, ic...">
-                                <datalist id="categoryList">
-                                    <option value="resistor">
-                                    <option value="capacitor">
-                                    <option value="ic">
-                                    <option value="conector">
-                                    <option value="modulo">
-                                    <option value="sensor">
-                                    <option value="led">
-                                    <option value="transistor">
-                                    <option value="diodo">
-                                    <option value="indutor">
-                                    <option value="rele">
-                                    <option value="fusivel">
-                                    <option value="cristal">
-                                    <option value="outro">
-                                </datalist>
-                                @error('category')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <!-- Quantidade -->
-                            <div class="col-md-6 mb-3">
-                                <label for="quantity" class="form-label">Quantidade</label>
-                                <input type="number" class="form-control @error('quantity') is-invalid @enderror"
-                                       id="quantity" name="quantity" value="{{ old('quantity', 1) }}" min="1">
-                                @error('quantity')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <!-- Local -->
-                        <div class="mb-3">
-                            <label for="location_id" class="form-label">Local</label>
-                            <select class="form-select @error('location_id') is-invalid @enderror"
-                                    id="location_id" name="location_id">
-                                <option value="">Selecione um local...</option>
-                                @foreach($locations as $location)
-                                    <option value="{{ $location->id }}" {{ old('location_id', $locationId) == $location->id ? 'selected' : '' }}>
-                                        {{ $location->path }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('location_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                            <div class="form-text">
-                                <a href="{{ route('locations.create') }}" target="_blank">
-                                    <i class="bi bi-plus me-1"></i>Criar novo local
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Tags -->
-                        <div class="mb-3">
-                            <label for="tags" class="form-label">Tags</label>
-                            <input type="text" class="form-control @error('tags') is-invalid @enderror"
-                                   id="tags" name="tags" value="{{ old('tags') }}"
-                                   placeholder="Separe as tags por virgula: eletronica, 5v, smd...">
-                            @error('tags')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                            @if($tags->count() > 0)
-                                <div class="form-text">
-                                    Tags existentes:
-                                    @foreach($tags->take(10) as $tag)
-                                        <span class="badge tag-badge" style="background-color: {{ $tag->color }}"
-                                              onclick="addTag('{{ $tag->name }}')">{{ $tag->name }}</span>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-
-                        <!-- Notas -->
-                        <div class="mb-3">
-                            <label for="notes" class="form-label">Notas adicionais</label>
-                            <textarea class="form-control @error('notes') is-invalid @enderror"
-                                      id="notes" name="notes" rows="2" placeholder="Observacoes, onde comprou, etc...">{{ old('notes') }}</textarea>
-                            @error('notes')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Botoes -->
-                        <div class="d-flex justify-content-between">
-                            <a href="{{ route('items.index') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left me-1"></i>Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg me-1"></i>Salvar Item
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+<div class="action-dock">
+    <div class="inner">
+        <button type="submit" form="itemForm" class="btn btn-primary btn-lg"><i class="bi bi-check2"></i> Salvar peça</button>
     </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const uploadZone = document.getElementById('uploadZone');
-    const photoInput = document.getElementById('photoInput');
-    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
-    const imagePreview = document.getElementById('imagePreview');
-    const previewImg = imagePreview.querySelector('img');
-    const removePhotoBtn = document.getElementById('removePhoto');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const aiLoading = document.getElementById('aiLoading');
-    const aiResult = document.getElementById('aiResult');
-
-    // Click no upload zone
-    uploadZone.addEventListener('click', function(e) {
-        if (e.target !== removePhotoBtn && !removePhotoBtn.contains(e.target)) {
-            photoInput.click();
-        }
-    });
-
-    // Drag and drop
-    uploadZone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        uploadZone.classList.add('dragover');
-    });
-
-    uploadZone.addEventListener('dragleave', function() {
-        uploadZone.classList.remove('dragover');
-    });
-
-    uploadZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        uploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            photoInput.files = e.dataTransfer.files;
-            handleFileSelect(e.dataTransfer.files[0]);
-        }
-    });
-
-    // File input change
-    photoInput.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            handleFileSelect(this.files[0]);
-        }
-    });
-
-    function handleFileSelect(file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Por favor, selecione uma imagem.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImg.src = e.target.result;
-            uploadPlaceholder.classList.add('d-none');
-            imagePreview.classList.remove('d-none');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // Remove photo
-    removePhotoBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        photoInput.value = '';
-        uploadPlaceholder.classList.remove('d-none');
-        imagePreview.classList.add('d-none');
-        aiResult.classList.add('d-none');
-    });
-
-    // IA: uma chamada; o servidor usa o modelo de visao (se houver foto) e o de decisao
-    const pct = p => p == null ? '' : ` (${Math.round(p * 100)}%)`;
+(function () {
+    const form = document.getElementById('itemForm');
+    const input = document.getElementById('photoInput');
+    const zone = document.getElementById('cameraZone');
+    const area = document.getElementById('aiArea');
+    const $ = id => document.getElementById(id);
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const pct = p => p == null ? '' : `<span class="pct">${Math.round(p * 100)}%</span>`;
+    let rodando = false;
 
-    analyzeBtn.addEventListener('click', async function() {
-        const nameInput = document.getElementById('name');
-        if (!photoInput.files.length && !nameInput.value.trim()) {
-            showAi('warning', 'Tire uma foto ou digite o nome da peca primeiro.');
-            return;
+    input.addEventListener('change', async () => {
+        if (!input.files.length) return;
+        const pequena = await window.shrinkImage(input.files[0], 1600);
+        const dt = new DataTransfer();
+        dt.items.add(pequena);
+        input.files = dt.files;
+
+        zone.classList.add('has-photo');
+        zone.querySelectorAll('img, .retake, .busy').forEach(e => e.remove());
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(pequena);
+        img.alt = 'Foto da peça';
+        zone.appendChild(img);
+        const retake = document.createElement('span');
+        retake.className = 'btn btn-quiet btn-sm retake';
+        retake.innerHTML = '<i class="bi bi-arrow-repeat"></i> Outra foto';
+        zone.appendChild(retake);
+
+        analisar(true);
+    });
+
+    $('suggestFromName').addEventListener('click', () => {
+        if (!$('name').value.trim()) {
+            $('name').focus();
+            return window.toast('Digite o nome da peça primeiro.', 'error');
         }
+        analisar(false);
+    });
 
-        const formData = new FormData();
-        if (photoInput.files.length) formData.append('photo', photoInput.files[0]);
-        if (nameInput.value.trim()) formData.append('name', nameInput.value.trim());
-        const desc = document.getElementById('description').value.trim();
-        if (desc) formData.append('description', desc);
+    async function analisar(comFoto) {
+        if (rodando) return;
+        rodando = true;
+        const fd = new FormData();
+        if (comFoto && input.files.length) fd.append('photo', input.files[0]);
+        if ($('name').value.trim()) fd.append('name', $('name').value.trim());
+        if ($('description').value.trim()) fd.append('description', $('description').value.trim());
 
-        aiLoading.classList.add('active');
-        analyzeBtn.disabled = true;
-        aiResult.classList.add('d-none');
-        document.getElementById('aiDuplicate').classList.add('d-none');
+        let busy = null;
+        if (comFoto) {
+            busy = document.createElement('div');
+            busy.className = 'busy';
+            busy.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Identificando a peça...';
+            zone.appendChild(busy);
+        }
+        area.innerHTML = '<div class="suggest"><div class="skeleton" style="width:60%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:40%"></div></div>';
 
         try {
-            const response = await fetch('{{ route('items.analyze') }}', {
+            const res = await fetch('{{ route('items.analyze') }}', {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                },
-                body: formData
+                headers: { 'X-CSRF-TOKEN': window.csrf, 'Accept': 'application/json' },
+                body: fd,
             });
-            const result = await response.json();
-
-            if (!result.success) {
-                showAi('danger', result.message || 'Nao foi possivel identificar a peca.');
-                return;
-            }
-            applySuggestion(result.data);
-        } catch (error) {
-            console.error('Erro ao analisar:', error);
-            showAi('danger', 'Erro ao conectar com a IA. Tente novamente.');
+            const r = await res.json().catch(() => ({}));
+            if (!res.ok || !r.success) throw new Error(r.message || 'A IA não respondeu. Preencha a mão ou tente de novo.');
+            aplicar(r.data);
+        } catch (e) {
+            area.innerHTML = '';
+            window.toast(e.message, 'error');
         } finally {
-            aiLoading.classList.remove('active');
-            analyzeBtn.disabled = false;
+            busy && busy.remove();
+            rodando = false;
         }
-    });
-
-    function showAi(kind, html) {
-        aiResult.className = `alert alert-${kind} mt-2`;
-        aiResult.innerHTML = html;
     }
 
-    function applySuggestion(data) {
-        const setIfEmpty = (id, value) => {
-            const el = document.getElementById(id);
-            if (value && !el.value.trim()) el.value = value;
-        };
-        setIfEmpty('name', data.name);
-        setIfEmpty('description', data.description);
-        if (data.category) setIfEmpty('category', data.category.value);
+    function preencher(id, valor) {
+        const el = $(id);
+        if (valor && !el.value.trim()) el.value = valor;
+    }
 
-        const tagNames = (data.tags || []).map(t => t.name);
-        tagNames.forEach(addTag);
+    function aplicar(d) {
+        preencher('name', d.name);
+        preencher('description', d.description);
+        if (d.category && !$('category').value) $('category').value = d.category.value;
+        (d.tags || []).forEach(t => window.addTag(t.name));
+        $('ai_description').value = d.description || '';
+        $('ai_metadata').value = JSON.stringify({ specs: d.specs || {}, visible_text: d.visible_text || '', models: d.models || {} });
 
-        document.getElementById('ai_description').value = data.description || '';
-        document.getElementById('ai_metadata').value = JSON.stringify({
-            specs: data.specs || {},
-            visible_text: data.visible_text || '',
-            models: data.models || {},
-        });
+        const loc = d.location;
+        if (loc && loc.suggested && !$('location_id').value) $('location_id').value = String(loc.suggested.id);
+
+        let html = '';
+        if (d.duplicate) {
+            const dup = d.duplicate;
+            html += `<div class="dup mb-3">
+                <strong>Você já tem essa peça?</strong> ${pct(dup.probability)}
+                <div class="my-1"><a href="${esc(dup.url)}">${esc(dup.name)}</a>: ${esc(dup.quantity)} un.${dup.location ? ' na ' + esc(dup.location) : ''}</div>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-dark flex-fill" id="somarDup">É a mesma: somar</button>
+                    <button type="button" class="btn btn-sm btn-light flex-fill" id="ignorarDup">É outra peça</button>
+                </div></div>`;
+        }
 
         const linhas = [];
-        if (data.category) linhas.push(`<b>Categoria:</b> ${esc(data.category.label || data.category.value)}${pct(data.category.probability)}`);
-        if (tagNames.length) {
-            linhas.push('<b>Tags:</b> ' + data.tags.map(t => esc(t.name) + (t.existing ? pct(t.probability) : ' (nova)')).join(', '));
-        }
-        const specs = Object.entries(data.specs || {});
-        if (specs.length) linhas.push('<b>Specs:</b> ' + specs.map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(', '));
-
-        const loc = data.location;
-        const select = document.getElementById('location_id');
+        if (d.category) linhas.push(`<div>${esc(d.category.label || d.category.value)} ${pct(d.category.probability)}</div>`);
         if (loc && loc.suggested) {
-            if (!select.value) select.value = String(loc.suggested.id);
-            linhas.push(`<b>Guardar em:</b> ${esc(loc.suggested.path)}${pct(loc.suggested.probability)}`);
+            linhas.push(`<div class="mt-1">Guardar em <span class="tape">${esc(loc.suggested.path.split('/').pop())}</span> ${pct(loc.suggested.probability)}</div>`);
         } else if (loc && loc.options && loc.options.length) {
-            linhas.push('<b>Nenhuma caixa combina bem.</b> Mais perto: ' + loc.options.map(o => esc(o.path) + pct(o.probability)).join(', '));
+            linhas.push(`<div class="mt-1 small-muted">Nenhuma caixa combina bem com essa peça.</div>`);
         }
-        if (data.models) linhas.push(`<small class="text-muted">Modelos: ${esc(data.models.vision || 'sem foto')} + ${esc(data.models.decision)}</small>`);
-        showAi('info', linhas.join('<br>'));
+        const specs = Object.entries(d.specs || {});
+        if (specs.length) {
+            linhas.push('<dl class="kv mt-2 mb-0">' + specs.slice(0, 6).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>');
+        }
+        html += `<div class="suggest"><h3 class="h3">${esc(d.name || 'Sugestão')}</h3>${linhas.join('')}
+            <div class="why mt-2">Preenchi os campos abaixo. Confira antes de salvar.</div></div>`;
+        area.innerHTML = html;
 
-        const dup = data.duplicate;
-        const dupBox = document.getElementById('aiDuplicate');
-        if (dup) {
-            dupBox.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i><b>Voce ja tem isso?</b> `
-                + `<a href="${esc(dup.url)}" target="_blank">${esc(dup.name)}</a> (${esc(dup.quantity)} un.`
-                + `${dup.location ? ', em ' + esc(dup.location) : ''})${pct(dup.probability)}. `
-                + 'Se for a mesma peca, abra o item e aumente a quantidade.';
-            dupBox.classList.remove('d-none');
+        if (d.duplicate) {
+            $('somarDup').addEventListener('click', async () => {
+                const n = Math.max(1, Number($('quantity').value) || 1);
+                try {
+                    await window.api(`/items/${d.duplicate.id}/quantity`, 'PATCH', { delta: n });
+                    window.location.href = d.duplicate.url;
+                } catch (e) {
+                    window.toast(e.message, 'error');
+                }
+            });
+            $('ignorarDup').addEventListener('click', e => e.target.closest('.dup').remove());
         }
     }
-});
 
-function addTag(tagName) {
-    const tagsInput = document.getElementById('tags');
-    const currentTags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-
-    if (!currentTags.includes(tagName)) {
-        currentTags.push(tagName);
-        tagsInput.value = currentTags.join(', ');
-    }
-}
+    form.addEventListener('submit', e => {
+        if (!$('name').value.trim()) {
+            e.preventDefault();
+            $('name').focus();
+            window.toast('Falta o nome da peça.', 'error');
+        }
+    });
+})();
 </script>
 @endpush

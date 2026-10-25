@@ -1,226 +1,196 @@
 @extends('layouts.app')
 
 @section('title', $item->name)
+@section('heading', 'Peça')
+@php
+    // Volta para onde veio (lista filtrada, caixa, busca), menos telas de formulario.
+    $anterior = url()->previous();
+    $voltar = ($anterior !== url()->current() && str_starts_with($anterior, url('/')) && !preg_match('#/(edit|create)(\?|$)#', $anterior))
+        ? $anterior : route('items.index');
+@endphp
+@section('back', $voltar)
+
+@section('top-actions')
+    <button type="button" class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#acoes" aria-label="Mais ações">
+        <i class="bi bi-three-dots-vertical"></i>
+    </button>
+@endsection
+
+@php $specs = $item->specList(); @endphp
 
 @section('content')
-<div class="container py-4">
-    <div class="row">
-        <!-- Foto -->
-        <div class="col-lg-5 mb-4">
-            <div class="card">
-                @if($item->preview_photo_url)
-                    <a href="{{ $item->original_photo_url }}" target="_blank">
-                        <img src="{{ $item->preview_photo_url }}" class="card-img-top" alt="{{ $item->name }}">
-                    </a>
-                @else
-                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 300px;">
-                        <i class="bi bi-image text-muted" style="font-size: 5rem;"></i>
-                    </div>
-                @endif
-            </div>
+<div class="page">
+    @if($item->preview_photo_url)
+        <a href="{{ $item->original_photo_url }}" target="_blank" rel="noopener">
+            <img src="{{ $item->preview_photo_url }}" class="hero-photo" alt="Foto de {{ $item->name }}">
+        </a>
+    @else
+        <a href="{{ route('items.edit', $item) }}" class="hero-empty compact">
+            <i class="bi bi-camera"></i> Adicionar foto
+        </a>
+    @endif
 
-            @if($item->getMedia('photos')->count() > 1)
-                <div class="row g-2 mt-2">
-                    @foreach($item->getMedia('photos') as $media)
-                        <div class="col-3">
-                            <a href="{{ $media->getUrl() }}" target="_blank">
-                                <img src="{{ $media->getUrl('thumb') }}" class="img-fluid rounded" alt="Foto">
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
+    <div class="page-head mt-3">
+        <h2 class="h1 mb-2">{{ $item->name }}</h2>
+        <div class="d-flex flex-wrap gap-3 align-items-center">
+            @if($item->category)
+                <a href="{{ route('items.index', ['category' => $item->category]) }}" class="small-muted">
+                    {{ \Illuminate\Support\Str::before(config('ai.categories.' . $item->category, $item->category), ' (') }}
+                </a>
             @endif
-        </div>
-
-        <!-- Detalhes -->
-        <div class="col-lg-7">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <h2 class="mb-1">{{ $item->name }}</h2>
-                    @if($item->category)
-                        <span class="badge bg-secondary">{{ ucfirst($item->category) }}</span>
-                    @endif
-                </div>
-                <div class="btn-group">
-                    <a href="{{ route('items.edit', $item) }}" class="btn btn-outline-primary">
-                        <i class="bi bi-pencil me-1"></i>Editar
-                    </a>
-                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Guardar por NFC (Android) -->
-            <div class="card mb-3">
-                <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
-                    <span><i class="bi bi-geo-alt me-1"></i>{{ $item->location?->path ?? 'Sem local' }}</span>
-                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto d-none" id="nfcMoveBtn">
-                        <i class="bi bi-broadcast me-1"></i>Guardar: encostar na caixa
-                    </button>
-                    <small class="text-muted w-100 d-none" id="nfcMoveHint">
-                        No iPhone: encoste o celular na tag da caixa e use "Guardar item aqui".
-                    </small>
-                    <div class="w-100 small d-none" id="nfcMoveStatus"></div>
-                </div>
-            </div>
-
-            <!-- Quantidade -->
-            @if($item->quantity > 1)
-                <div class="alert alert-info py-2">
-                    <i class="bi bi-stack me-1"></i>Quantidade: <strong>{{ $item->quantity }}</strong> unidades
-                </div>
-            @endif
-
-            <!-- Local -->
-            @if($item->location)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">Local</h6>
-                    <a href="{{ route('locations.show', $item->location) }}" class="text-decoration-none">
-                        <i class="bi bi-geo-alt me-1"></i>{{ $item->location->path }}
-                    </a>
-                </div>
-            @endif
-
-            <!-- Descricao -->
-            @if($item->description)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">Descricao</h6>
-                    <p class="mb-0">{{ $item->description }}</p>
-                </div>
-            @endif
-
-            <!-- Descricao da IA -->
-            @if($item->ai_description && $item->ai_description != $item->description)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">
-                        <i class="bi bi-robot me-1"></i>Identificado pela IA
-                    </h6>
-                    <p class="mb-0 text-muted fst-italic">{{ $item->ai_description }}</p>
-                </div>
-            @endif
-
-            <!-- Specs da IA -->
-            @if($item->ai_metadata && count($item->ai_metadata) > 0)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">Especificacoes</h6>
-                    <table class="table table-sm table-borderless mb-0">
-                        @foreach($item->ai_metadata as $key => $value)
-                            @if($value)
-                                <tr>
-                                    <td class="text-muted" style="width: 40%;">{{ ucfirst($key) }}</td>
-                                    <td>{{ $value }}</td>
-                                </tr>
-                            @endif
-                        @endforeach
-                    </table>
-                </div>
-            @endif
-
-            <!-- Tags -->
-            @if($item->tags->count() > 0)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">Tags</h6>
-                    <div>
-                        @foreach($item->tags as $tag)
-                            <a href="{{ route('items.index', ['tag_id' => $tag->id]) }}"
-                               class="badge text-decoration-none me-1" style="background-color: {{ $tag->color }}">
-                                {{ $tag->name }}
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
-            <!-- Notas -->
-            @if($item->notes)
-                <div class="mb-3">
-                    <h6 class="text-muted small text-uppercase">Notas</h6>
-                    <p class="mb-0">{{ $item->notes }}</p>
-                </div>
-            @endif
-
-            <!-- Metadata -->
-            <div class="text-muted small mt-4">
-                <i class="bi bi-clock me-1"></i>Criado em {{ $item->created_at->format('d/m/Y H:i') }}
-                @if($item->updated_at != $item->created_at)
-                    <br><i class="bi bi-pencil me-1"></i>Atualizado em {{ $item->updated_at->format('d/m/Y H:i') }}
-                @endif
-            </div>
+            @foreach($item->tags as $tag)
+                <a href="{{ route('items.index', ['tag_id' => $tag->id]) }}" class="tag-dot" style="--c: {{ $tag->color }}">{{ $tag->name }}</a>
+            @endforeach
         </div>
     </div>
 
-    <!-- Voltar -->
-    <div class="mt-4">
-        <a href="{{ route('items.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Voltar para lista
-        </a>
+    {{-- Quantidade: o uso mais frequente na bancada --}}
+    <div class="stepper" role="group" aria-label="Quantidade">
+        <button type="button" data-delta="-1" aria-label="Tirar uma"><i class="bi bi-dash-lg"></i></button>
+        <div class="value" aria-live="polite">
+            <b id="qtyValue">{{ $item->quantity }}</b>
+            <span id="qtyLabel">{{ $item->quantity === 1 ? 'unidade' : 'unidades' }}</span>
+        </div>
+        <button type="button" data-delta="1" aria-label="Somar uma"><i class="bi bi-plus-lg"></i></button>
+    </div>
+
+    {{-- Onde esta --}}
+    <h3 class="group-title">Onde está</h3>
+    <div class="rows">
+        @if($item->location)
+            <a href="{{ route('locations.show', $item->location) }}" class="row-item">
+                <span class="grow">
+                    <span><span class="tape tape-lg">{{ $item->location->name }}</span></span>
+                    @if($item->location->parent_id)
+                        <span class="sub">{{ $item->location->path }}</span>
+                    @endif
+                </span>
+                <i class="bi bi-chevron-right end"></i>
+            </a>
+        @else
+            <div class="row-item"><span class="grow"><span class="sub">Ainda sem caixa.</span></span></div>
+        @endif
+    </div>
+    <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-quiet flex-fill" data-bs-toggle="offcanvas" data-bs-target="#trocarCaixa">
+            <i class="bi bi-arrow-left-right"></i> Trocar caixa
+        </button>
+        <button type="button" class="btn btn-outline-primary flex-fill d-none" id="nfcMoveBtn">
+            <i class="bi bi-broadcast"></i> Encostar na caixa
+        </button>
+    </div>
+
+    @if($item->description)
+        <h3 class="group-title">O que é</h3>
+        <p class="mx-1" style="max-width: 62ch">{{ $item->description }}</p>
+    @endif
+
+    @if($specs)
+        <h3 class="group-title">Especificações</h3>
+        <div class="panel">
+            <dl class="kv">
+                @foreach($specs as $chave => $valor)
+                    <dt>{{ $chave }}</dt><dd>{{ $valor }}</dd>
+                @endforeach
+            </dl>
+        </div>
+    @endif
+
+    @if($item->notes)
+        <h3 class="group-title">Notas</h3>
+        <p class="mx-1" style="white-space: pré-line; max-width: 62ch">{{ $item->notes }}</p>
+    @endif
+
+    <p class="small-muted mx-1 mt-4">
+        Cadastrada em {{ $item->created_at->format('d/m/Y') }}@if($item->updated_at->ne($item->created_at)), alterada em {{ $item->updated_at->format('d/m/Y H:i') }}@endif.
+    </p>
+</div>
+
+{{-- Trocar de caixa --}}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="trocarCaixa" aria-labelledby="trocarTitulo">
+    <div class="grabber"></div>
+    <div class="offcanvas-header pb-1">
+        <h2 class="h3 mb-0" id="trocarTitulo">Guardar em</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        @forelse($locations as $loc)
+            <button type="button" class="sheet-action" data-location="{{ $loc->id }}" {{ $item->location_id === $loc->id ? 'disabled' : '' }}>
+                <i class="bi {{ $item->location_id === $loc->id ? 'bi-check2' : 'bi-box-seam' }}"></i>
+                <span class="text-truncate">{{ $loc->path }}</span>
+            </button>
+        @empty
+            <p class="px-3 small-muted">Nenhuma caixa cadastrada.</p>
+        @endforelse
+        <a href="{{ route('locations.create') }}" class="sheet-action"><i class="bi bi-plus-lg"></i> Nova caixa</a>
     </div>
 </div>
 
-<!-- Modal de exclusao -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusao</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir <strong>{{ $item->name }}</strong>?</p>
-                <p class="text-muted small">Esta acao nao pode ser desfeita.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="{{ route('items.destroy', $item) }}" method="POST" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash me-1"></i>Excluir
-                    </button>
-                </form>
-            </div>
-        </div>
+{{-- Mais acoes --}}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="acoes" aria-label="Ações da peça">
+    <div class="grabber"></div>
+    <div class="offcanvas-body p-0 py-2">
+        <a href="{{ route('items.edit', $item) }}" class="sheet-action"><i class="bi bi-pencil"></i> Editar peça</a>
+        <form action="{{ route('items.destroy', $item) }}" method="POST"
+              onsubmit="return confirm('Excluir {{ addslashes($item->name) }}? Não dá para desfazer.');">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="sheet-action danger"><i class="bi bi-trash"></i> Excluir peça</button>
+        </form>
     </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('nfcMoveBtn');
-    const status = document.getElementById('nfcMoveStatus');
-    if (!window.nfc.supported) {
-        document.getElementById('nfcMoveHint').classList.remove('d-none');
-        return;
-    }
-    btn.classList.remove('d-none');
-    btn.addEventListener('click', async function() {
-        status.className = 'w-100 small text-muted';
-        status.textContent = 'Encoste o celular na tag da caixa...';
-        btn.disabled = true;
-        try {
-            const tag = await window.nfc.read();
-            const response = await fetch('{{ route('items.nfc-move', $item) }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ tag }),
-            });
-            const result = await response.json();
-            status.className = 'w-100 small ' + (result.success ? 'text-success' : 'text-danger');
-            status.textContent = result.message;
-            if (result.success) setTimeout(() => location.reload(), 800);
-        } catch (e) {
-            status.className = 'w-100 small text-danger';
-            status.textContent = e.message;
-        } finally {
-            btn.disabled = false;
-        }
+(function () {
+    const qtyValue = document.getElementById('qtyValue');
+    const qtyLabel = document.getElementById('qtyLabel');
+    let pendente = Promise.resolve();
+
+    document.querySelectorAll('.stepper [data-delta]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const delta = Number(btn.dataset.delta);
+            const antes = Number(qtyValue.textContent);
+            if (antes + delta < 0) return;
+            // mostra na hora; o servidor confirma em seguida (fila para não embaralhar toques rapidos)
+            qtyValue.textContent = antes + delta;
+            if (navigator.vibrate) navigator.vibrate(8);
+            pendente = pendente.then(() => window.api('{{ route('items.quantity', $item) }}', 'PATCH', { delta }))
+                .then(r => {
+                    qtyValue.textContent = r.quantity;
+                    qtyLabel.textContent = r.quantity === 1 ? 'unidade' : 'unidades';
+                })
+                .catch(e => { qtyValue.textContent = antes; window.toast(e.message, 'error'); });
+        });
     });
-});
+
+    document.querySelectorAll('#trocarCaixa [data-location]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            try {
+                await window.api('{{ route('items.move', $item) }}', 'PATCH', { location_id: Number(btn.dataset.location) });
+                window.location.reload();
+            } catch (e) {
+                window.toast(e.message, 'error');
+            }
+        });
+    });
+
+    if (window.nfc.supported) {
+        const nfcBtn = document.getElementById('nfcMoveBtn');
+        nfcBtn.classList.remove('d-none');
+        nfcBtn.addEventListener('click', async () => {
+            const tag = await window.nfc.readWithSheet('Guardar nesta caixa');
+            if (!tag) return;
+            try {
+                const r = await window.api('{{ route('items.nfc-move', $item) }}', 'POST', { tag });
+                window.toast(r.message);
+                setTimeout(() => window.location.reload(), 700);
+            } catch (e) {
+                window.toast(e.message, 'error');
+            }
+        });
+    }
+})();
 </script>
 @endpush

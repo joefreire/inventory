@@ -63,6 +63,7 @@ class ItemController extends Controller
         $items = $query->latest()->paginate(24)->withQueryString();
 
         $locations = Location::whereNull('parent_id')->with('allChildren')->get();
+        $locationsFlat = Location::orderBy('path')->get(['id', 'name', 'path']);
         $tags = Tag::withCount('items')->orderBy('name')->get();
         $categories = Item::whereNotNull('category')
             ->distinct()
@@ -70,7 +71,7 @@ class ItemController extends Controller
             ->sort()
             ->values();
 
-        return view('items.index', compact('items', 'locations', 'tags', 'categories'));
+        return view('items.index', compact('items', 'locations', 'locationsFlat', 'tags', 'categories'));
     }
 
     /**
@@ -103,7 +104,7 @@ class ItemController extends Controller
 
         return redirect()
             ->route('items.show', $item)
-            ->with('success', 'Item criado com sucesso!');
+            ->with('success', 'Peça salva.');
     }
 
     /**
@@ -115,8 +116,9 @@ class ItemController extends Controller
     public function show(Item $item): View
     {
         $item->load(['location', 'tags', 'media']);
+        $locations = Location::orderBy('path')->get(['id', 'name', 'path']);
 
-        return view('items.show', compact('item'));
+        return view('items.show', compact('item', 'locations'));
     }
 
     /**
@@ -153,7 +155,7 @@ class ItemController extends Controller
 
         return redirect()
             ->route('items.show', $item)
-            ->with('success', 'Item atualizado com sucesso!');
+            ->with('success', 'Alterações salvas.');
     }
 
     /**
@@ -168,12 +170,12 @@ class ItemController extends Controller
 
         return redirect()
             ->route('items.index')
-            ->with('success', 'Item excluido com sucesso!');
+            ->with('success', 'Peça excluída.');
     }
 
     /**
-     * Sugere o cadastro pela foto e/ou pelo que ja foi digitado: nome,
-     * descricao, specs, categoria, tags, caixa e se a peca ja existe.
+     * Sugere o cadastro pela foto e/ou pelo que já foi digitado: nome,
+     * descrição, specs, categoria, tags, caixa e se a peça já existe.
      *
      * @param Request $request
      * @param ItemAdvisor $advisor
@@ -197,7 +199,7 @@ class ItemController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'A IA nao respondeu: ' . $e->getMessage(),
+                'message' => 'A IA não respondeu: ' . $e->getMessage(),
             ], 502);
         }
 
@@ -222,11 +224,31 @@ class ItemController extends Controller
                 $results = $search->search($pergunta);
             } catch (AiException $e) {
                 Log::warning('IA: falha na busca', ['error' => $e->getMessage()]);
-                $error = 'A IA nao respondeu: ' . $e->getMessage();
+                $error = 'A IA não respondeu: ' . $e->getMessage();
             }
         }
 
         return view('items.ask', compact('pergunta', 'results', 'error'));
+    }
+
+    /**
+     * Soma ou tira unidades (botoes + e - da tela do item). Nunca fica negativo.
+     *
+     * @param Request $request
+     * @param Item $item
+     * @return JsonResponse
+     */
+    public function quantity(Request $request, Item $item): JsonResponse
+    {
+        $validated = $request->validate(['delta' => 'required|integer|between:-1000,1000|not_in:0']);
+
+        $item->update(['quantity' => max(0, $item->quantity + (int) $validated['delta'])]);
+
+        return response()->json([
+            'success' => true,
+            'quantity' => $item->quantity,
+            'message' => "{$item->quantity} " . ($item->quantity === 1 ? 'unidade' : 'unidades'),
+        ]);
     }
 
     /**
@@ -246,7 +268,7 @@ class ItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Item movido com sucesso!',
+            'message' => 'Peça guardada.',
         ]);
     }
 }

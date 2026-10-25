@@ -63,7 +63,7 @@ class TagController extends Controller
 
         return redirect()
             ->route('tags.index')
-            ->with('success', "Tag '{$tag->name}' criada com sucesso!");
+            ->with('success', "Tag {$tag->name} criada.");
     }
 
     /**
@@ -106,7 +106,7 @@ class TagController extends Controller
 
         return redirect()
             ->route('tags.index')
-            ->with('success', "Tag '{$tag->name}' atualizada com sucesso!");
+            ->with('success', "Alterações salvas.");
     }
 
     /**
@@ -122,7 +122,7 @@ class TagController extends Controller
 
         return redirect()
             ->route('tags.index')
-            ->with('success', "Tag '{$name}' excluida com sucesso!");
+            ->with('success', "Tag {$name} excluída.");
     }
 
     /**

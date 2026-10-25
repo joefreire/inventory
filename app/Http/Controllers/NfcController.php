@@ -12,8 +12,8 @@ use Illuminate\Http\Request;
 /**
  * Tags NFC das caixas.
  *
- * A tag guarda so um link /n/{codigo}. Encostar o celular (Android ou iPhone)
- * abre a pagina da caixa. No Android, o app tambem le a tag pelo navegador
+ * A tag guarda só um link /n/{codigo}. Encostar o celular (Android ou iPhone)
+ * abre a página da caixa. No Android, o app também le a tag pelo navegador
  * (Web NFC) para mover um item para a caixa encostada.
  */
 class NfcController extends Controller
@@ -45,7 +45,7 @@ class NfcController extends Controller
         if (!$location) {
             return response()->json([
                 'success' => false,
-                'message' => 'Essa tag nao e de nenhuma caixa do inventario.',
+                'message' => 'Essa tag não e de nenhuma caixa do inventário.',
             ], 404);
         }
 

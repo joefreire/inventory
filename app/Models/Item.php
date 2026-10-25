@@ -220,4 +220,30 @@ class Item extends Model implements HasMedia
 
         return $query->where('category', $category);
     }
+
+    /**
+     * Especificacoes para exibir. O ai_metadata ja teve dois formatos: o antigo
+     * (chave => valor direto) e o atual ({specs, visible_text, models}).
+     *
+     * @return array<string, string>
+     */
+    public function specList(): array
+    {
+        $meta = $this->ai_metadata ?? [];
+        $specs = isset($meta['specs']) && is_array($meta['specs'])
+            ? $meta['specs']
+            : array_diff_key($meta, array_flip(['visible_text', 'models']));
+
+        $lista = [];
+        foreach ($specs as $chave => $valor) {
+            if (is_scalar($valor) && trim((string) $valor) !== '') {
+                $lista[str_replace('_', ' ', ucfirst((string) $chave))] = trim((string) $valor);
+            }
+        }
+        if (!empty($meta['visible_text']) && is_string($meta['visible_text'])) {
+            $lista['Texto na peca'] = $meta['visible_text'];
+        }
+
+        return $lista;
+    }
 }

@@ -199,7 +199,7 @@ class AiTest extends TestCase
     {
         Http::fake();
 
-        $this->get(route('items.ask'))->assertOk()->assertSee('Perguntar ao inventario');
+        $this->get(route('items.ask'))->assertOk()->assertSee('Descreva o que precisa');
 
         Http::assertNothingSent();
     }

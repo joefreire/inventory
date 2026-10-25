@@ -19,7 +19,7 @@ class ItemControllerTest extends TestCase
         $response = $this->get(route('items.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('Itens');
+        $response->assertSee('Peças');
     }
 
     public function test_items_index_shows_items(): void
@@ -77,7 +77,7 @@ class ItemControllerTest extends TestCase
         $response = $this->get(route('items.create'));
 
         $response->assertStatus(200);
-        $response->assertSee('Adicionar Novo Item');
+        $response->assertSee('Tirar foto da peça');
     }
 
     public function test_can_store_item(): void
@@ -135,7 +135,7 @@ class ItemControllerTest extends TestCase
         $response = $this->get(route('items.edit', $item));
 
         $response->assertStatus(200);
-        $response->assertSee('Editar Item');
+        $response->assertSee('Editar peça');
         $response->assertSee('Resistor 10k');
     }
 
@@ -196,5 +196,33 @@ class ItemControllerTest extends TestCase
 
         $item->refresh();
         $this->assertEquals($location->id, $item->location_id);
+    }
+
+    public function test_quantity_buttons_add_and_never_go_negative(): void
+    {
+        $item = Item::create(['name' => 'Resistor 10k', 'quantity' => 2]);
+
+        $this->patchJson(route('items.quantity', $item), ['delta' => 3])->assertOk()->assertJsonPath('quantity', 5);
+        $this->patchJson(route('items.quantity', $item), ['delta' => -10])->assertOk()->assertJsonPath('quantity', 0);
+        $this->patchJson(route('items.quantity', $item), ['delta' => 0])->assertStatus(422);
+    }
+
+    public function test_show_page_lists_specs_from_both_metadata_formats(): void
+    {
+        $antigo = Item::create(['name' => 'Antigo', 'ai_metadata' => ['valor' => '10k', 'vazio' => '']]);
+        $novo = Item::create(['name' => 'Novo', 'ai_metadata' => [
+            'specs' => ['tensao' => '5V'], 'visible_text' => 'SRD-05VDC', 'models' => ['vision' => 'x'],
+        ]]);
+
+        $this->get(route('items.show', $antigo))->assertOk()->assertSee('10k')->assertDontSee('Vazio');
+        $this->get(route('items.show', $novo))->assertOk()->assertSee('5V')->assertSee('SRD-05VDC')->assertDontSee('Models');
+    }
+
+    public function test_edit_allows_zero_quantity(): void
+    {
+        $item = Item::create(['name' => 'Acabou', 'quantity' => 3]);
+
+        $this->put(route('items.update', $item), ['name' => 'Acabou', 'quantity' => 0])->assertRedirect(route('items.show', $item));
+        $this->assertSame(0, $item->fresh()->quantity);
     }
 }

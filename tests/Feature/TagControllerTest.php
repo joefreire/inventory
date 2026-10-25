@@ -34,7 +34,7 @@ class TagControllerTest extends TestCase
         $response = $this->get(route('tags.create'));
 
         $response->assertStatus(200);
-        $response->assertSee('Nova Tag');
+        $response->assertSee('Nova tag');
     }
 
     public function test_can_store_tag(): void
@@ -117,7 +117,7 @@ class TagControllerTest extends TestCase
         $response = $this->get(route('tags.edit', $tag));
 
         $response->assertStatus(200);
-        $response->assertSee('Editar Tag');
+        $response->assertSee('Editar tag');
     }
 
     public function test_can_update_tag(): void

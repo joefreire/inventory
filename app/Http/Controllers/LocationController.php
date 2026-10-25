@@ -72,7 +72,7 @@ class LocationController extends Controller
 
         return redirect()
             ->route('locations.index')
-            ->with('success', "Local '{$location->name}' criado com sucesso!");
+            ->with('success', "Caixa {$location->name} criada.");
     }
 
     /**
@@ -90,7 +90,7 @@ class LocationController extends Controller
             ->latest()
             ->paginate(24);
 
-        // Para "Guardar item aqui" (iPhone: a tag abre esta pagina)
+        // Para "Guardar item aqui" (iPhone: a tag abre esta página)
         $otherItems = Item::where(fn ($q) => $q->whereNull('location_id')->orWhere('location_id', '!=', $location->id))
             ->with('location')
             ->orderBy('name')
@@ -128,7 +128,7 @@ class LocationController extends Controller
 
         return redirect()
             ->route('locations.index')
-            ->with('success', "Local '{$location->name}' atualizado com sucesso!");
+            ->with('success', "Alterações salvas.");
     }
 
     /**
@@ -144,7 +144,7 @@ class LocationController extends Controller
 
         return redirect()
             ->route('locations.index')
-            ->with('success', "Local '{$name}' excluido com sucesso!");
+            ->with('success', "Caixa {$name} excluída.");
     }
 
     /**

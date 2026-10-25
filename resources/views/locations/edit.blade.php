@@ -1,79 +1,28 @@
 @extends('layouts.app')
 
-@section('title', 'Editar ' . $location->name)
+@section('title', 'Editar caixa')
+@section('back', route('locations.show', $location))
+@section('body-class', 'has-dock')
 
 @section('content')
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-pencil me-2"></i>Editar Local</h5>
-                </div>
-                <div class="card-body">
-                    <form action="{{ route('locations.update', $location) }}" method="POST">
-                        @csrf
-                        @method('PUT')
+<div class="page">
+    <form action="{{ route('locations.update', $location) }}" method="POST" id="locationForm">
+        @csrf
+        @method('PUT')
+        @include('locations._fields', ['location' => $location])
+    </form>
 
-                        <!-- Nome -->
-                        <div class="mb-3">
-                            <label for="name" class="form-label fw-bold">Nome *</label>
-                            <input type="text" class="form-control @error('name') is-invalid @enderror"
-                                   id="name" name="name" value="{{ old('name', $location->name) }}" required>
-                            @error('name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Local pai -->
-                        <div class="mb-3">
-                            <label for="parent_id" class="form-label">Local pai</label>
-                            <select class="form-select @error('parent_id') is-invalid @enderror"
-                                    id="parent_id" name="parent_id">
-                                <option value="">Nenhum (raiz)</option>
-                                @foreach($locations as $loc)
-                                    <option value="{{ $loc->id }}"
-                                            {{ old('parent_id', $location->parent_id) == $loc->id ? 'selected' : '' }}>
-                                        {{ $loc->path }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('parent_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Descricao -->
-                        <div class="mb-3">
-                            <label for="description" class="form-label">Descricao</label>
-                            <textarea class="form-control @error('description') is-invalid @enderror"
-                                      id="description" name="description" rows="2">{{ old('description', $location->description) }}</textarea>
-                            @error('description')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <!-- Info -->
-                        <div class="alert alert-info py-2 mb-3">
-                            <small>
-                                <i class="bi bi-info-circle me-1"></i>
-                                Este local contem {{ $location->total_item_count }} itens no total.
-                            </small>
-                        </div>
-
-                        <!-- Botoes -->
-                        <div class="d-flex justify-content-between">
-                            <a href="{{ route('locations.index') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left me-1"></i>Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg me-1"></i>Salvar Alteracoes
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+    <form action="{{ route('locations.destroy', $location) }}" method="POST" class="mt-4"
+          onsubmit="return confirm('Excluir a caixa {{ addslashes($location->name) }}? As caixas dentro dela também saem; as peças ficam sem caixa.');">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="btn btn-quiet text-danger w-100"><i class="bi bi-trash"></i> Excluir caixa</button>
+    </form>
+</div>
+<div class="action-dock">
+    <div class="inner">
+        <a href="{{ route('locations.show', $location) }}" class="btn btn-quiet">Cancelar</a>
+        <button type="submit" form="locationForm" class="btn btn-primary"><i class="bi bi-check2"></i> Salvar alterações</button>
     </div>
 </div>
 @endsection

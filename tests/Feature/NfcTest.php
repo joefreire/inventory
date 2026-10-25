@@ -88,6 +88,6 @@ class NfcTest extends TestCase
         $location = Location::create(['name' => 'Caixa']);
 
         $this->assertSame("https://inventario.exemplo/n/{$location->nfc_code}", $location->nfc_url);
-        $this->get(route('locations.show', $location))->assertDontSee('NFC_BASE_URL nao definido');
+        $this->get(route('locations.show', $location))->assertDontSee('NFC_BASE_URL não definido');
     }
 }

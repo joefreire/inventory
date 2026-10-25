@@ -17,6 +17,7 @@ Route::middleware('auth')->group(function () {
     Route::post('items/analyze', [ItemController::class, 'analyze'])->name('items.analyze');
     Route::resource('items', ItemController::class);
     Route::patch('items/{item}/move', [ItemController::class, 'move'])->name('items.move');
+    Route::patch('items/{item}/quantity', [ItemController::class, 'quantity'])->name('items.quantity');
 
     // Locations
     Route::resource('locations', LocationController::class);

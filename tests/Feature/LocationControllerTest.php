@@ -16,7 +16,7 @@ class LocationControllerTest extends TestCase
         $response = $this->get(route('locations.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('Locais');
+        $response->assertSee('Caixas');
     }
 
     public function test_locations_index_shows_locations(): void
@@ -34,7 +34,7 @@ class LocationControllerTest extends TestCase
         $response = $this->get(route('locations.create'));
 
         $response->assertStatus(200);
-        $response->assertSee('Novo Local');
+        $response->assertSee('Nova caixa');
     }
 
     public function test_can_store_location(): void
@@ -105,7 +105,7 @@ class LocationControllerTest extends TestCase
         $response = $this->get(route('locations.edit', $location));
 
         $response->assertStatus(200);
-        $response->assertSee('Editar Local');
+        $response->assertSee('Editar caixa');
     }
 
     public function test_can_update_location(): void

@@ -21,6 +21,8 @@ class UpdateItemRequest extends StoreItemRequest
     {
         return array_merge(parent::rules(), [
             'remove_photo' => 'nullable|boolean',
+            // na edicao a peca pode ter acabado
+            'quantity' => 'nullable|integer|min:0',
         ]);
     }
 
