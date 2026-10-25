@@ -47,21 +47,36 @@ return [
         'indutor' => 'Indutor ou bobina',
         'diodo' => 'Diodo (inclui zener e ponte retificadora)',
         'led' => 'LED, fita de LED ou display de LED simples',
-        'transistor' => 'Transistor, MOSFET ou regulador de tensao em encapsulamento TO',
+        'transistor' => 'Transistor, MOSFET ou regulador de tensão avulso',
         'ic' => 'Circuito integrado (chip avulso)',
         'microcontrolador' => 'Placa de microcontrolador (ESP32, ESP8266, Arduino, RP2040)',
-        'modulo' => 'Modulo ou placa pronta (driver, conversor, rele, display, radio)',
-        'sensor' => 'Sensor (temperatura, presenca, distancia, corrente, gas)',
+        'modulo' => 'Módulo ou placa pronta (driver, conversor, relé, rádio, teclado)',
+        'sensor' => 'Sensor (temperatura, presença, distância, corrente, gás)',
         'display' => 'Tela ou display (LCD, OLED, e-paper, TFT)',
+        'audio' => 'Som (buzzer, alto-falante, microfone, amplificador)',
         'conector' => 'Conector, borne, header ou jumper',
         'cabo' => 'Cabo ou fio',
-        'fonte' => 'Fonte, carregador, bateria ou conversor de energia',
-        'motor' => 'Motor, servo, atuador ou bomba',
-        'rele' => 'Rele avulso ou contator',
-        'chave' => 'Chave, botao ou interruptor',
+        'fonte' => 'Fonte, carregador, bateria, UPS ou conversor de energia',
+        'protecao' => 'Proteção (fusível, porta-fusível, varistor, disjuntor)',
+        'motor' => 'Motor, servo, solenoide, trava elétrica ou bomba',
+        'rele' => 'Relé avulso ou contator',
+        'chave' => 'Chave, botão ou interruptor',
+        'mecanica' => 'Peça mecânica (rolamento, polia, correia, engrenagem, eixo, mola)',
+        'fixacao' => 'Parafuso, porca, inserto, espaçador ou fixação',
+        'impressao_3d' => 'Peça impressa em 3D ou filamento',
         'ferramenta' => 'Ferramenta',
-        'impressao_3d' => 'Peca impressa em 3D ou filamento',
-        'fixacao' => 'Parafuso, porca, espacador ou fixacao',
         'outro' => 'Outra coisa',
     ],
+
+    // Tags que servem para quase tudo e por isso nao filtram nada (revisao de
+    // 2026-10-25: "componente" em 15 de 23 pecas, "eletrica" em 14).
+    // Comparadas sem acento e sem hifen.
+    'generic_tags' => [
+        'componente', 'componentes', 'eletrica', 'eletrico', 'eletronica', 'eletronico',
+        'eletronicos', 'hardware', 'peca', 'pecas', 'item', 'diy', 'maker', 'projeto',
+        'projetos', 'geral', 'outro', 'outros',
+    ],
+
+    // No maximo quantas tags a IA sugere por peca (existentes + novas).
+    'max_tags' => 5,
 ];

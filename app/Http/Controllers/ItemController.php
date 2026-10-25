@@ -48,8 +48,10 @@ class ItemController extends Controller
             $query->search($request->search);
         }
 
-        if ($request->filled('location_id')) {
-            $query->inLocation($request->location_id);
+        if ($request->query('location_id') === 'nenhuma') {
+            $query->whereNull('location_id');
+        } elseif ($request->filled('location_id')) {
+            $query->inLocation((int) $request->location_id);
         }
 
         if ($request->filled('tag_id')) {
@@ -64,6 +66,7 @@ class ItemController extends Controller
 
         $locations = Location::whereNull('parent_id')->with('allChildren')->get();
         $locationsFlat = Location::orderBy('path')->get(['id', 'name', 'path']);
+        $semCaixa = Item::whereNull('location_id')->count();
         $tags = Tag::withCount('items')->orderBy('name')->get();
         $categories = Item::whereNotNull('category')
             ->distinct()
@@ -71,7 +74,7 @@ class ItemController extends Controller
             ->sort()
             ->values();
 
-        return view('items.index', compact('items', 'locations', 'locationsFlat', 'tags', 'categories'));
+        return view('items.index', compact('items', 'locations', 'locationsFlat', 'semCaixa', 'tags', 'categories'));
     }
 
     /**
@@ -101,6 +104,13 @@ class ItemController extends Controller
             $request->getTagNames(),
             $request->file('photo')
         );
+
+        // "Salvar e proxima": volta ao cadastro na mesma caixa (cadastro em sequencia)
+        if ($request->boolean('proxima')) {
+            return redirect()
+                ->route('items.create', array_filter(['location_id' => $item->location_id]))
+                ->with('success', "Peça salva: {$item->name}. Pode tirar a próxima foto.");
+        }
 
         return redirect()
             ->route('items.show', $item)

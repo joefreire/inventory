@@ -32,7 +32,10 @@
 
 <div class="action-dock">
     <div class="inner">
-        <button type="submit" form="itemForm" class="btn btn-primary btn-lg"><i class="bi bi-check2"></i> Salvar peça</button>
+        <button type="submit" form="itemForm" name="proxima" value="1" class="btn btn-quiet" title="Salva e abre outro cadastro na mesma caixa">
+            <i class="bi bi-plus-lg"></i> Salvar e próxima
+        </button>
+        <button type="submit" form="itemForm" class="btn btn-primary"><i class="bi bi-check2"></i> Salvar peça</button>
     </div>
 </div>
 @endsection
@@ -48,6 +51,9 @@
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const pct = p => p == null ? '' : `<span class="pct">${Math.round(p * 100)}%</span>`;
     let rodando = false;
+    // a IA so mexe na quantidade se o dono ainda nao mexeu
+    let qtdTocada = false;
+    $('quantity').addEventListener('input', () => { qtdTocada = true; });
 
     input.addEventListener('change', async () => {
         if (!input.files.length) return;
@@ -122,6 +128,7 @@
         preencher('name', d.name);
         preencher('description', d.description);
         if (d.category && !$('category').value) $('category').value = d.category.value;
+        if (d.quantity && !qtdTocada && !d.kit) $('quantity').value = d.quantity;
         (d.tags || []).forEach(t => window.addTag(t.name));
         $('ai_description').value = d.description || '';
         $('ai_metadata').value = JSON.stringify({ specs: d.specs || {}, visible_text: d.visible_text || '', models: d.models || {} });
@@ -143,6 +150,11 @@
 
         const linhas = [];
         if (d.category) linhas.push(`<div>${esc(d.category.label || d.category.value)} ${pct(d.category.probability)}</div>`);
+        if (d.kit) {
+            linhas.push(`<div class="mt-1">É um kit sortido${d.quantity ? ' com ' + esc(d.quantity) + ' peças' : ''}: deixei quantidade 1 (um kit).</div>`);
+        } else if (d.quantity && !qtdTocada) {
+            linhas.push(`<div class="mt-1">Quantidade da embalagem: <b>${esc(d.quantity)}</b></div>`);
+        }
         if (loc && loc.suggested) {
             linhas.push(`<div class="mt-1">Guardar em <span class="tape">${esc(loc.suggested.path.split('/').pop())}</span> ${pct(loc.suggested.probability)}</div>`);
         } else if (loc && loc.options && loc.options.length) {

@@ -225,4 +225,25 @@ class ItemControllerTest extends TestCase
         $this->put(route('items.update', $item), ['name' => 'Acabou', 'quantity' => 0])->assertRedirect(route('items.show', $item));
         $this->assertSame(0, $item->fresh()->quantity);
     }
+
+    public function test_save_and_next_returns_to_create_in_same_box(): void
+    {
+        $caixa = Location::create(['name' => 'Caixa azul']);
+
+        $this->post(route('items.store'), ['name' => 'Rele 5V', 'location_id' => $caixa->id, 'proxima' => '1'])
+            ->assertRedirect(route('items.create', ['location_id' => $caixa->id]));
+
+        $this->get(route('items.create', ['location_id' => $caixa->id]))
+            ->assertSee('value="' . $caixa->id . '" selected', false);
+    }
+
+    public function test_filter_items_without_box(): void
+    {
+        $caixa = Location::create(['name' => 'Caixa azul']);
+        Item::create(['name' => 'Na caixa', 'location_id' => $caixa->id]);
+        Item::create(['name' => 'Solta']);
+
+        $this->get(route('items.index', ['location_id' => 'nenhuma']))
+            ->assertOk()->assertSee('Solta')->assertDontSee('Na caixa');
+    }
 }

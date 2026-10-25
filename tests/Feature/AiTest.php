@@ -203,4 +203,46 @@ class AiTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_vision_quantity_kit_spec_keys_and_generic_tags(): void
+    {
+        $generica = Tag::create(['name' => 'componente']);
+        $util = Tag::create(['name' => 'lipo']);
+
+        Http::fake([
+            'ollama.test/api/chat' => Http::response($this->chatResponse([
+                'name' => 'Conector XT60',
+                'quantity' => '20',
+                'kit' => false,
+                'specs' => ['Tensão Bobina' => '5V', 'modelo' => 'XT60'],
+                'tags' => ['Elétrica', 'xt60', 'componente'],
+            ])),
+            'ollama.test/v1/systemone' => function (Request $request) use ($generica, $util) {
+                // a tag generica nem vira pergunta
+                $this->assertArrayNotHasKey("tag_{$generica->id}", $request['questions']);
+
+                return Http::response(['answers' => ["tag_{$util->id}" => ['type' => 'noul', 'noul' => 0.9]]]);
+            },
+        ]);
+
+        $r = $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('xt60.jpg')])->assertOk();
+
+        $r->assertJsonPath('data.quantity', 20)
+            ->assertJsonPath('data.kit', false)
+            ->assertJsonPath('data.specs', ['tensao_bobina' => '5V', 'modelo' => 'XT60']);
+        $this->assertSame(['lipo', 'xt60'], array_column($r->json('data.tags'), 'name'));
+    }
+
+    public function test_invalid_vision_quantity_is_ignored(): void
+    {
+        Http::fake([
+            'ollama.test/api/chat' => Http::response($this->chatResponse(['name' => 'Kit resistores', 'quantity' => 'muitos', 'kit' => true])),
+            'ollama.test/v1/systemone' => Http::response(['answers' => []]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('k.jpg')])
+            ->assertOk()
+            ->assertJsonPath('data.quantity', null)
+            ->assertJsonPath('data.kit', true);
+    }
 }

@@ -26,17 +26,25 @@ class ItemAdvisor
     private const MAX_TAGS_NOVAS = 3;
 
     private const VISION_SYSTEM = <<<'PROMPT'
-Voce identifica componentes eletronicos, pecas e ferramentas para um inventario pessoal.
+Você identifica componentes eletrônicos, peças e ferramentas para um inventário pessoal.
+A foto pode ser da peça solta ou da embalagem/anúncio dela.
 Responda APENAS um objeto JSON:
 {
-  "name": "nome tecnico curto (ex.: Capacitor eletrolitico 100uF 25V, Modulo rele 2 canais 5V)",
-  "description": "o que e e para que serve, em portugues, ate 200 caracteres, para quem esta aprendendo eletronica",
+  "name": "nome curto em português, até 45 caracteres, com o modelo quando houver",
+  "description": "o que é e para que serve, em português, até 200 caracteres, para quem está aprendendo eletrônica",
+  "quantity": número de unidades na foto ou escrito na embalagem (ex.: "10PCS" = 10, "100-Pack" = 100, "5 pares" = 10) ou null se não der para saber,
+  "kit": true se for um sortimento de valores diferentes (kit de resistores, caixa de fusíveis variados), senão false,
   "specs": {"chave": "valor"},
-  "visible_text": "texto ou codigos impressos que da para ler na peca, ou vazio",
-  "tags": ["ate 5 tags curtas em minusculas"]
+  "visible_text": "texto ou códigos impressos que dá para ler, sem números de pedido nem 'Made in China'",
+  "tags": ["até 4 tags"]
 }
-Em specs, use so o que da para ver ou deduzir com seguranca (valor, tensao, encapsulamento, marca, modelo, pinos).
-Se nao der para identificar, use name "Peca nao identificada" e explique o que aparece na foto.
+Nome: em português, sem tradução entre parênteses, sem a palavra "Kit" se não for sortimento.
+Exemplos de nome: "Relé 5V 10A JQC-3F", "Servo MG996R", "Módulo ponte H L298N", "Rolamento 608ZZ", "Buzzer passivo 12mm".
+Em specs use só o que dá para ver ou deduzir com segurança e estas chaves, em minúsculas e sem acento:
+modelo, marca, valor, tensao, corrente, potencia, tolerancia, encapsulamento, pinos, canais, dimensoes, material, faixa, interface, quantidade_por_pacote.
+Tags: minúsculas, sem acento, específicas da peça (ex.: "ponte-h", "lipo", "esp8266", "12v", "pwm").
+Nunca use tags genéricas que valem para qualquer peça: componente, eletrica, eletronica, hardware, peca, modulo.
+Se não der para identificar, use name "Peça não identificada" e explique o que aparece na foto.
 PROMPT;
 
     public function __construct(private readonly OllamaClient $ollama)
@@ -58,6 +66,8 @@ PROMPT;
             'specs' => [],
             'visible_text' => '',
             'tags' => [],
+            'quantity' => null,
+            'kit' => false,
         ];
         $visionModel = null;
 
@@ -65,7 +75,7 @@ PROMPT;
             $vision = $this->ollama->chatJson(
                 config('ai.models.vision'),
                 self::VISION_SYSTEM,
-                'Identifique a peca da foto.' . ($peca['name'] ? " O dono acha que e: {$peca['name']}." : ''),
+                'Identifique a peça da foto.' . ($peca['name'] ? " O dono acha que é: {$peca['name']}." : ''),
                 $images
             );
             $visionModel = $vision['model'];
@@ -73,10 +83,15 @@ PROMPT;
         }
 
         if ($peca['name'] === '' && $peca['description'] === '') {
-            throw new AiException('Mande uma foto ou digite o nome da peca.');
+            throw new AiException('Mande uma foto ou digite o nome da peça.');
         }
 
-        $tags = Tag::query()->withCount('items')->orderByDesc('items_count')->limit(self::MAX_TAGS)->get();
+        // Tags genericas ("componente", "eletrica") ficam fora: o modelo de decisao
+        // aprova elas para tudo e elas nao ajudam a filtrar.
+        $tags = Tag::query()->withCount('items')->orderByDesc('items_count')->get()
+            ->reject(fn (Tag $t) => self::tagGenerica($t->name))
+            ->take(self::MAX_TAGS)
+            ->values();
         $locations = Location::query()->orderBy('path')->limit(config('ai.decision_limits.choice_options') - 1)->get();
         $candidatos = $this->candidatos($peca['name']);
 
@@ -84,7 +99,7 @@ PROMPT;
         foreach ($tags as $tag) {
             $questions["tag_{$tag->id}"] = [
                 'type' => 'noul',
-                'instructions' => "A tag \"{$tag->name}\" descreve esta peca?",
+                'instructions' => "A tag \"{$tag->name}\" descreve esta peça especificamente (não vale para qualquer peça)?",
             ];
         }
         if ($locations->isNotEmpty()) {
@@ -108,6 +123,8 @@ PROMPT;
             'description' => $peca['description'],
             'specs' => $peca['specs'],
             'visible_text' => $peca['visible_text'],
+            'quantity' => $peca['quantity'],
+            'kit' => $peca['kit'],
             'category' => $this->categoryAnswer($answers['categoria'] ?? null),
             'tags' => $this->tagsAnswer($answers, $tags, $peca['tags']),
             'location' => $this->locationAnswer($answers['local'] ?? null, $locations),
@@ -123,22 +140,37 @@ PROMPT;
      */
     private function mergeVision(array $peca, array $data): array
     {
-        $specs = is_array($data['specs'] ?? null) ? $data['specs'] : [];
-        $specs = array_filter(
-            array_map(fn ($v) => is_scalar($v) ? trim((string) $v) : null, $specs),
-            fn ($v) => $v !== null && $v !== ''
-        );
+        $specs = [];
+        foreach ((is_array($data['specs'] ?? null) ? $data['specs'] : []) as $chave => $valor) {
+            $valor = is_scalar($valor) ? trim((string) $valor) : '';
+            $chave = Str::slug(Str::ascii((string) $chave), '_');
+            if ($valor !== '' && $chave !== '') {
+                $specs[$chave] = $valor;
+            }
+        }
+
+        $quantidade = filter_var($data['quantity'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100000]]);
 
         return [
-            'name' => $peca['name'] ?: Str::limit(trim((string) ($data['name'] ?? '')), 120, ''),
+            'name' => $peca['name'] ?: Str::limit(trim((string) ($data['name'] ?? '')), 80, ''),
             'description' => $peca['description'] ?: Str::limit(trim((string) ($data['description'] ?? '')), 500, ''),
             'specs' => $specs,
             'visible_text' => Str::limit(trim((string) ($data['visible_text'] ?? '')), 200, ''),
-            'tags' => array_values(array_filter(array_map(
-                fn ($t) => is_string($t) ? Str::lower(trim($t)) : '',
-                (array) ($data['tags'] ?? [])
-            ))),
+            'tags' => array_values(array_filter(
+                array_map(fn ($t) => is_string($t) ? Str::lower(trim($t)) : '', (array) ($data['tags'] ?? [])),
+                fn ($t) => $t !== '' && !self::tagGenerica($t)
+            )),
+            'quantity' => $quantidade === false ? null : $quantidade,
+            'kit' => (bool) ($data['kit'] ?? false),
         ];
+    }
+
+    /**
+     * Tag que vale para quase qualquer peca (config ai.generic_tags).
+     */
+    public static function tagGenerica(string $nome): bool
+    {
+        return in_array(Str::slug(Str::ascii($nome), ''), config('ai.generic_tags', []), true);
     }
 
     /**
@@ -258,23 +290,30 @@ PROMPT;
     private function tagsAnswer(array $answers, Collection $tags, array $sugeridas): array
     {
         $limite = config('ai.thresholds.tag');
+        $maximo = config('ai.max_tags', 5);
         $resultado = [];
 
+        $aprovadas = [];
         foreach ($tags as $tag) {
             $p = (float) ($answers["tag_{$tag->id}"]['noul'] ?? 0);
             if ($p >= $limite) {
-                $resultado[] = ['name' => $tag->name, 'existing' => true, 'probability' => round($p, 3)];
+                $aprovadas[] = ['name' => $tag->name, 'existing' => true, 'probability' => round($p, 3)];
             }
         }
+        usort($aprovadas, fn ($a, $b) => $b['probability'] <=> $a['probability']);
+        $resultado = array_slice($aprovadas, 0, $maximo);
 
-        // Novas so se nao forem variacao de uma tag que ja existe ("3d print" x "3d").
-        $existentes = $tags->map(fn ($t) => Str::slug($t->name, ''))->filter()->all();
+        // Novas so se nao forem variacao de uma tag que ja existe ("3d print" x "3d",
+        // "eletrica" x "elétrica"). Partes curtas (<4) so contam se forem iguais.
+        $existentes = $tags->map(fn ($t) => Str::slug(Str::ascii($t->name), ''))->filter()->all();
         $novas = 0;
         foreach (array_unique($sugeridas) as $nome) {
-            $slug = Str::slug($nome, '');
-            $parecida = collect($existentes)->contains(
-                fn ($e) => $slug === '' || str_contains($slug, $e) || str_contains($e, $slug)
-            );
+            if (count($resultado) >= $maximo) {
+                break;
+            }
+            $slug = Str::slug(Str::ascii($nome), '');
+            $parecida = $slug === '' || collect($existentes)->contains(fn ($e) => $e === $slug
+                || (min(strlen($e), strlen($slug)) >= 4 && (str_contains($slug, $e) || str_contains($e, $slug))));
             if (!$parecida && $novas < self::MAX_TAGS_NOVAS) {
                 $resultado[] = ['name' => $nome, 'existing' => false, 'probability' => null];
                 $existentes[] = $slug;

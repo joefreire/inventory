@@ -3,7 +3,7 @@
 @section('title', 'Peças')
 
 @php
-    $filtroLocal = request('location_id') ? $locationsFlat->firstWhere('id', (int) request('location_id')) : null;
+    $filtroLocal = request('location_id') && request('location_id') !== 'nenhuma' ? $locationsFlat->firstWhere('id', (int) request('location_id')) : null;
     $filtroTag = request('tag_id') ? $tags->firstWhere('id', (int) request('tag_id')) : null;
     $temFiltro = request()->hasAny(['location_id', 'tag_id', 'category']);
 @endphp
@@ -30,6 +30,10 @@
     @if($locationsFlat->isNotEmpty())
         <div class="chips" aria-label="Filtrar por caixa">
             <a href="{{ route('items.index', request()->except('location_id', 'page')) }}" class="chip {{ !request('location_id') ? 'active' : '' }}">Todas</a>
+            @if($semCaixa > 0)
+                <a href="{{ route('items.index', array_merge(request()->except('location_id', 'page'), ['location_id' => 'nenhuma'])) }}"
+                   class="chip {{ request('location_id') === 'nenhuma' ? 'active' : '' }}">Sem caixa <span class="small-muted">{{ $semCaixa }}</span></a>
+            @endif
             @foreach($locationsFlat as $loc)
                 <a href="{{ route('items.index', array_merge(request()->except('location_id', 'page'), ['location_id' => $loc->id])) }}"
                    class="chip {{ (int) request('location_id') === $loc->id ? 'active' : '' }}">{{ $loc->name }}</a>
