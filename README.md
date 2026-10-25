@@ -212,3 +212,36 @@ tests/
 ## License
 
 This project is open-sourced software licensed under the [MIT license](LICENSE).
+
+## Producao (canivete)
+
+`https://inventario.runningwithjoe.com`, no servidor canivete (`root@100.91.35.23`, Tailscale).
+
+| Peca | Onde |
+|---|---|
+| App | `/var/www/inventario` (dono `www-data`), SQLite em `database/database.sqlite`, fotos em `storage/app/public` |
+| PHP | pool `inventario` do `php8.4-fpm` (`/etc/php/8.4/fpm/pool.d/inventario.conf`). O `php` padrao do servidor continua 8.3: use `php8.4` |
+| Web | nginx `/etc/nginx/sites-available/inventario.conf`, so em `127.0.0.1:8182` |
+| Tunel | `cloudflared-inventario.service`, tunel `inventario-canivete` (`/etc/cloudflared/inventario.yml`) |
+| DNS | `cloudflared --origincert /root/.cloudflared/cert-runningwithjoe.pem tunnel route dns ...` (o `cert.pem` padrao do canivete so cobre opiniaotech.com) |
+
+Usuario (nao ha cadastro pela tela):
+```bash
+ssh -t root@100.91.35.23 'cd /var/www/inventario && sudo -u www-data php8.4 artisan inventario:usuario EMAIL'
+```
+
+Atualizar:
+```bash
+rsync -az --delete --exclude .git --exclude vendor --exclude node_modules --exclude .env \
+  --exclude 'database/*.sqlite' --exclude 'storage/logs/*' --exclude 'storage/app/public/*' \
+  --exclude 'storage/framework/sessions/*' --exclude 'storage/framework/views/*' \
+  --exclude 'storage/framework/cache/data/*' --exclude 'bootstrap/cache/*.php' --exclude public/storage \
+  ./ root@100.91.35.23:/var/www/inventario/
+ssh root@100.91.35.23 'cd /var/www/inventario && COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer install --no-dev -o -n \
+  && php8.4 artisan migrate --force && php8.4 artisan optimize && chown -R www-data:www-data . && chown root:www-data .env'
+```
+(`npm run build` antes, local: `public/build` vai no rsync.)
+
+O inventario anterior (FastAPI, agosto/2026) esta em `joefreire/inventario-eletronicos` e
+ainda roda no LXC 105 do Proxmox, sem dominio. As 2 pecas e 3 caixas reais dele foram
+migradas para ca em 2026-10-25.
