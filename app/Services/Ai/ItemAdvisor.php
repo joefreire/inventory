@@ -20,6 +20,9 @@ use Illuminate\Support\Str;
  */
 class ItemAdvisor
 {
+    /** Fotos que vao para a IA: limite de imagens do modelo de decisao na nuvem. */
+    public const MAX_FOTOS_IA = 4;
+
     private const MAX_TAGS = 50;
     private const MAX_CANDIDATOS = 200;
     private const ITENS_POR_LOCAL = 20;
@@ -27,7 +30,7 @@ class ItemAdvisor
 
     private const VISION_SYSTEM = <<<'PROMPT'
 Você identifica componentes eletrônicos, peças e ferramentas para um inventário pessoal.
-A foto pode ser da peça solta ou da embalagem/anúncio dela.
+Pode vir uma ou várias fotos da mesma peça: solta, frente, verso, etiqueta ou embalagem/anúncio.
 Responda APENAS um objeto JSON:
 {
   "name": "nome curto em português, até 45 caracteres, com o modelo quando houver",
@@ -52,13 +55,16 @@ PROMPT;
     }
 
     /**
-     * @param string|null $imagePath Foto da peca (opcional)
+     * @param array<int, string> $imagePaths Fotos da mesma peca (frente, verso, etiqueta), ate 4
      * @param array{name?: ?string, description?: ?string} $typed O que ja foi digitado no formulario
      * @return array<string, mixed>
      */
-    public function analyze(?string $imagePath, array $typed = []): array
+    public function analyze(array $imagePaths, array $typed = []): array
     {
-        $images = $imagePath ? [base64_encode((string) file_get_contents($imagePath))] : [];
+        $images = array_map(
+            fn ($path) => base64_encode((string) file_get_contents($path)),
+            array_slice(array_values(array_filter($imagePaths)), 0, self::MAX_FOTOS_IA)
+        );
 
         $peca = [
             'name' => trim((string) ($typed['name'] ?? '')),
@@ -75,7 +81,10 @@ PROMPT;
             $vision = $this->ollama->chatJson(
                 config('ai.models.vision'),
                 self::VISION_SYSTEM,
-                'Identifique a peça da foto.' . ($peca['name'] ? " O dono acha que é: {$peca['name']}." : ''),
+                (count($images) > 1
+                    ? 'Estas ' . count($images) . ' fotos são da MESMA peça (frente, verso, etiqueta ou embalagem). Junte o que cada uma mostra.'
+                    : 'Identifique a peça da foto.')
+                . ($peca['name'] ? " O dono acha que é: {$peca['name']}." : ''),
                 $images
             );
             $visionModel = $vision['model'];
@@ -130,6 +139,7 @@ PROMPT;
             'location' => $this->locationAnswer($answers['local'] ?? null, $locations),
             'duplicate' => $this->duplicateAnswer($answers['duplicado'] ?? null, $candidatos),
             'models' => ['vision' => $visionModel, 'decision' => config('ai.models.decision')],
+            'photos_used' => count($images),
         ];
     }
 

@@ -9,13 +9,8 @@
     <form action="{{ route('items.store') }}" method="POST" enctype="multipart/form-data" id="itemForm" novalidate>
         @csrf
 
-        {{-- Camera primeiro: a foto ja dispara a IA --}}
-        <label class="camera-zone mb-3" id="cameraZone" for="photoInput">
-            <input type="file" name="photo" id="photoInput" accept="image/*" capture="environment" class="d-none">
-            <span class="cam"><i class="bi bi-camera"></i></span>
-            <strong>Tirar foto da peça</strong>
-            <span class="small-muted px-4 text-center">A IA preenche o cadastro e sugere a caixa</span>
-        </label>
+        {{-- Camera primeiro: cada foto nova ja dispara a IA com todas as fotos --}}
+        @include('items._photos')
 
         <div id="aiArea" class="mb-3"></div>
 
@@ -42,38 +37,33 @@
 
 @push('scripts')
 <script>
-(function () {
+// DOMContentLoaded: o script do seletor de fotos (window.fotosPeca) entra depois deste
+document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('itemForm');
-    const input = document.getElementById('photoInput');
-    const zone = document.getElementById('cameraZone');
     const area = document.getElementById('aiArea');
     const $ = id => document.getElementById(id);
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const pct = p => p == null ? '' : `<span class="pct">${Math.round(p * 100)}%</span>`;
-    let rodando = false;
-    // a IA so mexe na quantidade se o dono ainda nao mexeu
-    let qtdTocada = false;
-    $('quantity').addEventListener('input', () => { qtdTocada = true; });
+    const MAX_IA = {{ \App\Services\Ai\ItemAdvisor::MAX_FOTOS_IA }};
+    let rodando = false, deNovo = false, timer = null;
 
-    input.addEventListener('change', async () => {
-        if (!input.files.length) return;
-        const pequena = await window.shrinkImage(input.files[0], 1600);
-        const dt = new DataTransfer();
-        dt.items.add(pequena);
-        input.files = dt.files;
+    // O que a IA preencheu. Numa nova analise ela so troca o que ainda e dela:
+    // se o dono editou o campo, o valor dele fica.
+    const daIa = {};
+    function preencher(id, valor) {
+        const el = $(id);
+        if (valor == null || valor === '') return;
+        const atual = el.value.trim();
+        if (atual === '' || (daIa[id] !== undefined && atual === String(daIa[id]))) {
+            el.value = valor;
+            daIa[id] = String(valor);
+        }
+    }
 
-        zone.classList.add('has-photo');
-        zone.querySelectorAll('img, .retake, .busy').forEach(e => e.remove());
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(pequena);
-        img.alt = 'Foto da peça';
-        zone.appendChild(img);
-        const retake = document.createElement('span');
-        retake.className = 'btn btn-quiet btn-sm retake';
-        retake.innerHTML = '<i class="bi bi-arrow-repeat"></i> Outra foto';
-        zone.appendChild(retake);
-
-        analisar(true);
+    // cada foto nova (ou removida) analisa de novo com todas, depois de uma pausa curta
+    window.fotosPeca.onChange(fotos => {
+        clearTimeout(timer);
+        if (fotos.length) timer = setTimeout(() => analisar(true), 500);
     });
 
     $('suggestFromName').addEventListener('click', () => {
@@ -85,21 +75,19 @@
     });
 
     async function analisar(comFoto) {
-        if (rodando) return;
+        if (rodando) { deNovo = comFoto; return; }
         rodando = true;
+        const fotos = comFoto ? window.fotosPeca.files().slice(0, MAX_IA) : [];
         const fd = new FormData();
-        if (comFoto && input.files.length) fd.append('photo', input.files[0]);
-        if ($('name').value.trim()) fd.append('name', $('name').value.trim());
-        if ($('description').value.trim()) fd.append('description', $('description').value.trim());
+        fotos.forEach(f => fd.append('photos[]', f));
+        // o nome so vai como dica se foi o dono que digitou
+        const nome = $('name').value.trim();
+        if (nome && nome !== daIa.name) fd.append('name', nome);
+        const desc = $('description').value.trim();
+        if (desc && desc !== daIa.description) fd.append('description', desc);
 
-        let busy = null;
-        if (comFoto) {
-            busy = document.createElement('div');
-            busy.className = 'busy';
-            busy.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Identificando a peça...';
-            zone.appendChild(busy);
-        }
-        area.innerHTML = '<div class="suggest"><div class="skeleton" style="width:60%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:40%"></div></div>';
+        if (fotos.length) window.fotosPeca.setBusy(true, fotos.length > 1 ? `Analisando ${fotos.length} fotos juntas...` : 'Identificando a peça...');
+        if (!area.innerHTML) area.innerHTML = '<div class="suggest"><div class="skeleton" style="width:60%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:40%"></div></div>';
 
         try {
             const res = await fetch('{{ route('items.analyze') }}', {
@@ -108,33 +96,37 @@
                 body: fd,
             });
             const r = await res.json().catch(() => ({}));
-            if (!res.ok || !r.success) throw new Error(r.message || 'A IA não respondeu. Preencha a mão ou tente de novo.');
+            if (!res.ok || !r.success) throw new Error(r.message || 'A IA não respondeu. Preencha à mão ou tente de novo.');
             aplicar(r.data);
         } catch (e) {
-            area.innerHTML = '';
+            if (area.querySelector('.skeleton')) area.innerHTML = '';
             window.toast(e.message, 'error');
         } finally {
-            busy && busy.remove();
+            window.fotosPeca.setBusy(false);
             rodando = false;
+            if (deNovo) { deNovo = false; analisar(true); }
         }
-    }
-
-    function preencher(id, valor) {
-        const el = $(id);
-        if (valor && !el.value.trim()) el.value = valor;
     }
 
     function aplicar(d) {
         preencher('name', d.name);
         preencher('description', d.description);
-        if (d.category && !$('category').value) $('category').value = d.category.value;
-        if (d.quantity && !qtdTocada && !d.kit) $('quantity').value = d.quantity;
-        (d.tags || []).forEach(t => window.addTag(t.name));
-        $('ai_description').value = d.description || '';
-        $('ai_metadata').value = JSON.stringify({ specs: d.specs || {}, visible_text: d.visible_text || '', models: d.models || {} });
-
+        if (d.category) preencher('category', d.category.value);
+        if (d.quantity && !d.kit) preencher('quantity', d.quantity);
         const loc = d.location;
-        if (loc && loc.suggested && !$('location_id').value) $('location_id').value = String(loc.suggested.id);
+        if (loc && loc.suggested) preencher('location_id', String(loc.suggested.id));
+
+        // tags: se o campo ainda e o que a IA pos, troca; senao soma
+        const nomes = (d.tags || []).map(t => t.name);
+        if ($('tags').value.trim() === '' || $('tags').value === daIa.tags) {
+            $('tags').value = nomes.join(', ');
+            daIa.tags = $('tags').value;
+        } else {
+            nomes.forEach(n => window.addTag(n));
+        }
+
+        $('ai_description').value = d.description || '';
+        $('ai_metadata').value = JSON.stringify({ specs: d.specs || {}, visible_text: d.visible_text || '', models: d.models || {}, photos_used: d.photos_used || 0 });
 
         let html = '';
         if (d.duplicate) {
@@ -152,7 +144,7 @@
         if (d.category) linhas.push(`<div>${esc(d.category.label || d.category.value)} ${pct(d.category.probability)}</div>`);
         if (d.kit) {
             linhas.push(`<div class="mt-1">É um kit sortido${d.quantity ? ' com ' + esc(d.quantity) + ' peças' : ''}: deixei quantidade 1 (um kit).</div>`);
-        } else if (d.quantity && !qtdTocada) {
+        } else if (d.quantity) {
             linhas.push(`<div class="mt-1">Quantidade da embalagem: <b>${esc(d.quantity)}</b></div>`);
         }
         if (loc && loc.suggested) {
@@ -162,10 +154,11 @@
         }
         const specs = Object.entries(d.specs || {});
         if (specs.length) {
-            linhas.push('<dl class="kv mt-2 mb-0">' + specs.slice(0, 6).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>');
+            linhas.push('<dl class="kv mt-2 mb-0">' + specs.slice(0, 8).map(([k, v]) => `<dt>${esc(k.replace(/_/g, ' '))}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>');
         }
+        const base = d.photos_used > 1 ? `Analisei as ${d.photos_used} fotos juntas.` : (d.photos_used === 1 ? 'Uma foto: verso ou etiqueta podem ajudar.' : 'Sem foto, só pelo nome.');
         html += `<div class="suggest"><h3 class="h3">${esc(d.name || 'Sugestão')}</h3>${linhas.join('')}
-            <div class="why mt-2">Preenchi os campos abaixo. Confira antes de salvar.</div></div>`;
+            <div class="why mt-2">${base} Preenchi os campos abaixo; confira antes de salvar.</div></div>`;
         area.innerHTML = html;
 
         if (d.duplicate) {
@@ -189,6 +182,6 @@
             window.toast('Falta o nome da peça.', 'error');
         }
     });
-})();
+});
 </script>
 @endpush

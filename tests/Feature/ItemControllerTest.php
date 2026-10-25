@@ -246,4 +246,49 @@ class ItemControllerTest extends TestCase
         $this->get(route('items.index', ['location_id' => 'nenhuma']))
             ->assertOk()->assertSee('Solta')->assertDontSee('Na caixa');
     }
+
+    public function test_store_saves_several_photos_in_order(): void
+    {
+        Storage::fake('public');
+
+        $this->post(route('items.store'), [
+            'name' => 'Rele 5V',
+            'photos' => [
+                UploadedFile::fake()->image('frente.jpg'),
+                UploadedFile::fake()->image('verso.jpg'),
+                UploadedFile::fake()->image('etiqueta.jpg'),
+            ],
+        ])->assertRedirect();
+
+        $item = Item::where('name', 'Rele 5V')->firstOrFail();
+        $this->assertSame(['frente.jpg', 'verso.jpg', 'etiqueta.jpg'], $item->getMedia('photos')->pluck('file_name')->all());
+        $this->get(route('items.show', $item))->assertOk()->assertSee('galleryDots', false);
+    }
+
+    public function test_update_removes_chosen_photo_and_adds_new_one(): void
+    {
+        Storage::fake('public');
+        $item = Item::create(['name' => 'Rele 5V']);
+        $a = $item->addMedia(UploadedFile::fake()->image('a.jpg'))->toMediaCollection('photos');
+        $item->addMedia(UploadedFile::fake()->image('b.jpg'))->toMediaCollection('photos');
+        $outra = Item::create(['name' => 'Outra']);
+        $alheia = $outra->addMedia(UploadedFile::fake()->image('x.jpg'))->toMediaCollection('photos');
+
+        $this->put(route('items.update', $item), [
+            'name' => 'Rele 5V',
+            'remove_media' => [$a->id, $alheia->id],
+            'photos' => [UploadedFile::fake()->image('c.jpg')],
+        ])->assertRedirect(route('items.show', $item));
+
+        $this->assertSame(['b.jpg', 'c.jpg'], $item->fresh()->getMedia('photos')->pluck('file_name')->all());
+        $this->assertCount(1, $outra->fresh()->getMedia('photos')); // foto de outra peca nao sai
+    }
+
+    public function test_store_rejects_more_than_max_photos(): void
+    {
+        Storage::fake('public');
+        $fotos = array_map(fn ($i) => UploadedFile::fake()->image("f{$i}.jpg"), range(1, 7));
+
+        $this->post(route('items.store'), ['name' => 'Muitas', 'photos' => $fotos])->assertSessionHasErrors('photos');
+    }
 }

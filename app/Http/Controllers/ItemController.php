@@ -102,7 +102,7 @@ class ItemController extends Controller
         $item = $this->itemService->create(
             $request->validatedWithProcessing(),
             $request->getTagNames(),
-            $request->file('photo')
+            $request->photoFiles()
         );
 
         // "Salvar e proxima": volta ao cadastro na mesma caixa (cadastro em sequencia)
@@ -159,8 +159,8 @@ class ItemController extends Controller
             $item,
             $request->validated(),
             $request->getTagNames(),
-            $request->file('photo'),
-            $request->shouldRemovePhoto()
+            $request->photoFiles(),
+            $request->mediaToRemove($item)
         );
 
         return redirect()
@@ -194,14 +194,21 @@ class ItemController extends Controller
     public function analyze(Request $request, ItemAdvisor $advisor): JsonResponse
     {
         $request->validate([
-            'photo' => 'nullable|required_without:name|image|max:10240',
-            'name' => 'nullable|required_without:photo|string|max:255',
+            'photo' => 'nullable|image|max:10240',
+            'photos' => 'nullable|array|max:' . ItemAdvisor::MAX_FOTOS_IA,
+            'photos.*' => 'image|max:10240',
+            'name' => 'nullable|required_without_all:photo,photos|string|max:255',
             'description' => 'nullable|string|max:1000',
         ]);
 
+        $fotos = array_values(array_filter((array) $request->file('photos', [])));
+        if ($request->hasFile('photo')) {
+            array_unshift($fotos, $request->file('photo'));
+        }
+
         try {
             $result = $advisor->analyze(
-                $request->file('photo')?->getRealPath(),
+                array_map(fn ($f) => $f->getRealPath(), $fotos),
                 $request->only('name', 'description')
             );
         } catch (AiException $e) {

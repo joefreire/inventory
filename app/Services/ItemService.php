@@ -14,14 +14,14 @@ use Illuminate\Http\UploadedFile;
 class ItemService
 {
     /**
-     * Create a new item with optional tags and photo.
+     * Create a new item with optional tags and photos (the first one is the main photo).
      *
      * @param array<string, mixed> $data Validated item data
      * @param array<string> $tagNames Array of tag names to associate
-     * @param UploadedFile|null $photo Photo file to upload
+     * @param array<int, UploadedFile> $photos Photos in display order
      * @return Item The created item
      */
-    public function create(array $data, array $tagNames = [], ?UploadedFile $photo = null): Item
+    public function create(array $data, array $tagNames = [], array $photos = []): Item
     {
         $item = Item::create($data);
 
@@ -29,7 +29,7 @@ class ItemService
             $item->syncTags($tagNames);
         }
 
-        if ($photo) {
+        foreach ($photos as $photo) {
             $this->uploadPhoto($item, $photo);
         }
 
@@ -42,16 +42,16 @@ class ItemService
      * @param Item $item The item to update
      * @param array<string, mixed> $data Validated item data
      * @param array<string>|null $tagNames Array of tag names (null to keep existing)
-     * @param UploadedFile|null $photo New photo file to upload
-     * @param bool $removePhoto Whether to remove the existing photo
+     * @param array<int, UploadedFile> $newPhotos Photos to add after the existing ones
+     * @param array<int, int> $removeMediaIds Ids of this item's photos to remove
      * @return Item The updated item
      */
     public function update(
         Item $item,
         array $data,
         ?array $tagNames = null,
-        ?UploadedFile $photo = null,
-        bool $removePhoto = false
+        array $newPhotos = [],
+        array $removeMediaIds = []
     ): Item {
         $item->update($data);
 
@@ -59,11 +59,12 @@ class ItemService
             $item->syncTags($tagNames);
         }
 
-        if ($removePhoto || $photo) {
-            $item->clearMediaCollection('photos');
+        if ($removeMediaIds) {
+            // so as fotos desta peca: id de outra peca e ignorado
+            $item->getMedia('photos')->whereIn('id', $removeMediaIds)->each->delete();
         }
 
-        if ($photo) {
+        foreach ($newPhotos as $photo) {
             $this->uploadPhoto($item, $photo);
         }
 

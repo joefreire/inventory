@@ -12,6 +12,9 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreItemRequest extends FormRequest
 {
+    /** Fotos por peca. A IA usa as 4 primeiras (limite do modelo de decisao). */
+    public const MAX_FOTOS = 6;
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -39,6 +42,9 @@ class StoreItemRequest extends FormRequest
             'notes' => 'nullable|string',
             'tags' => 'nullable|string',
             'photo' => 'nullable|image|max:10240',
+            // varias fotos da mesma peca (frente, verso, etiqueta)
+            'photos' => 'nullable|array|max:' . self::MAX_FOTOS,
+            'photos.*' => 'image|max:10240',
             'ai_metadata' => 'nullable|json',
         ];
     }
@@ -92,5 +98,20 @@ class StoreItemRequest extends FormRequest
             array_map('trim', explode(',', $tags)),
             fn($tag) => !empty($tag)
         );
+    }
+
+    /**
+     * Fotos enviadas, na ordem: `photos[]` e, por compatibilidade, `photo`.
+     *
+     * @return array<int, \Illuminate\Http\UploadedFile>
+     */
+    public function photoFiles(): array
+    {
+        $fotos = array_values(array_filter((array) $this->file('photos', [])));
+        if ($this->hasFile('photo')) {
+            array_unshift($fotos, $this->file('photo'));
+        }
+
+        return array_slice($fotos, 0, self::MAX_FOTOS);
     }
 }

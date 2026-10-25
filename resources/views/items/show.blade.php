@@ -20,10 +20,20 @@
 
 @section('content')
 <div class="page">
-    @if($item->preview_photo_url)
-        <a href="{{ $item->original_photo_url }}" target="_blank" rel="noopener">
-            <img src="{{ $item->preview_photo_url }}" class="hero-photo" alt="Foto de {{ $item->name }}">
-        </a>
+    @php $fotos = $item->getMedia('photos'); @endphp
+    @if($fotos->isNotEmpty())
+        <div class="gallery" id="gallery">
+            @foreach($fotos as $i => $media)
+                <a href="{{ $media->getUrl() }}" target="_blank" rel="noopener">
+                    <img src="{{ $media->getUrl('preview') }}" class="hero-photo" alt="Foto {{ $i + 1 }} de {{ $item->name }}" @if($i > 0) loading="lazy" @endif>
+                </a>
+            @endforeach
+        </div>
+        @if($fotos->count() > 1)
+            <div class="gallery-dots" id="galleryDots" aria-hidden="true">
+                @foreach($fotos as $i => $media)<span class="{{ $i === 0 ? 'on' : '' }}"></span>@endforeach
+            </div>
+        @endif
     @else
         <a href="{{ route('items.edit', $item) }}" class="hero-empty compact">
             <i class="bi bi-camera"></i> Adicionar foto
@@ -144,6 +154,15 @@
 @push('scripts')
 <script>
 (function () {
+    // bolinhas da galeria acompanham a foto visivel
+    const gal = document.getElementById('gallery'), dots = document.getElementById('galleryDots');
+    if (gal && dots) {
+        gal.addEventListener('scroll', () => {
+            const i = Math.round(gal.scrollLeft / gal.clientWidth);
+            dots.querySelectorAll('span').forEach((d, j) => d.classList.toggle('on', i === j));
+        }, { passive: true });
+    }
+
     const qtyValue = document.getElementById('qtyValue');
     const qtyLabel = document.getElementById('qtyLabel');
     let pendente = Promise.resolve();

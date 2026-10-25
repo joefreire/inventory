@@ -21,6 +21,8 @@ class UpdateItemRequest extends StoreItemRequest
     {
         return array_merge(parent::rules(), [
             'remove_photo' => 'nullable|boolean',
+            'remove_media' => 'nullable|array',
+            'remove_media.*' => 'integer',
             // na edicao a peca pode ter acabado
             'quantity' => 'nullable|integer|min:0',
         ]);
@@ -44,5 +46,19 @@ class UpdateItemRequest extends StoreItemRequest
     public function hasNewPhoto(): bool
     {
         return $this->hasFile('photo');
+    }
+
+    /**
+     * Ids das fotos a remover (remove_photo = todas, formato antigo).
+     *
+     * @return array<int, int>
+     */
+    public function mediaToRemove(\App\Models\Item $item): array
+    {
+        if ($this->shouldRemovePhoto()) {
+            return $item->getMedia('photos')->pluck('id')->all();
+        }
+
+        return array_map('intval', (array) $this->input('remove_media', []));
     }
 }

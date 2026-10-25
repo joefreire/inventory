@@ -245,4 +245,31 @@ class AiTest extends TestCase
             ->assertJsonPath('data.quantity', null)
             ->assertJsonPath('data.kit', true);
     }
+
+    public function test_several_photos_go_together_to_both_models(): void
+    {
+        Http::fake([
+            'ollama.test/api/chat' => Http::response($this->chatResponse(['name' => 'Rele 5V JQC-3F'])),
+            'ollama.test/v1/systemone' => Http::response(['answers' => []]),
+        ]);
+
+        $fotos = array_map(fn ($i) => UploadedFile::fake()->image("f{$i}.jpg"), range(1, 4));
+        $this->postJson(route('items.analyze'), ['photos' => $fotos])
+            ->assertOk()
+            ->assertJsonPath('data.photos_used', 4);
+
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/api/chat')
+            && count($r['messages'][1]['images']) === 4
+            && str_contains($r['messages'][1]['content'], 'MESMA peça'));
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/v1/systemone') && count($r['images']) === 4);
+    }
+
+    public function test_more_than_four_photos_for_ai_is_rejected(): void
+    {
+        Http::fake();
+        $fotos = array_map(fn ($i) => UploadedFile::fake()->image("f{$i}.jpg"), range(1, 5));
+
+        $this->postJson(route('items.analyze'), ['photos' => $fotos])->assertStatus(422);
+        Http::assertNothingSent();
+    }
 }
