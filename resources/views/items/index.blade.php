@@ -12,6 +12,9 @@
     <button type="button" class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#filtros" aria-label="Filtrar">
         <i class="bi {{ $hasFilter ? 'bi-funnel-fill' : 'bi-funnel' }}"></i>
     </button>
+    <button type="button" class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#menuConta" aria-label="Menu">
+        <i class="bi bi-three-dots-vertical"></i>
+    </button>
 @endsection
 
 @section('content')
@@ -137,6 +140,22 @@
         @if($hasFilter || request('search'))
             <a href="{{ route('items.index') }}" class="btn btn-quiet w-100 mt-4">Limpar filtros</a>
         @endif
+    </div>
+</div>
+
+{{-- Menu: Tags (on Android the tab bar swaps it for "Ler tag") and logout --}}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="menuConta" aria-label="Menu">
+    <div class="grabber"></div>
+    <div class="offcanvas-body p-0 py-2">
+        <a href="{{ route('tags.index') }}" class="sheet-action"><i class="bi bi-tags"></i> Tags</a>
+        <form action="{{ route('logout') }}" method="POST">
+            @csrf
+            <button type="submit" class="sheet-action">
+                <i class="bi bi-box-arrow-right"></i>
+                <span class="flex-fill text-start">Sair</span>
+                <span class="small-muted text-truncate" style="max-width: 55%">{{ auth()->user()->email }}</span>
+            </button>
+        </form>
     </div>
 </div>
 @endsection

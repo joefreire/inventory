@@ -42,12 +42,13 @@ test.describe('Login', () => {
     await expect(page.locator('.tape', { hasText: name })).toBeVisible();
   });
 
-  test('logout ends the session', async ({ page }) => {
+  test('"Sair" in the parts menu ends the session', async ({ page }) => {
     await login(page);
     await page.waitForURL(/\/items$/);
-    await page.request.post('/logout', {
-      form: { _token: await page.locator('meta[name="csrf-token"]').getAttribute('content') ?? '' },
-    });
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('button', { name: /Sair/ }).click();
+    await expect(page).toHaveURL(/\/login$/);
+
     await page.goto('/items');
     await expect(page).toHaveURL(/\/login$/);
   });

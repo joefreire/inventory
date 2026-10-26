@@ -29,6 +29,13 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL(/\/items$/);
   });
 
+  test('the parts menu reaches Tags (hidden from the tab bar on Android)', async ({ page }) => {
+    await page.goto('/items');
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.locator('#menuConta').getByRole('link', { name: 'Tags' }).click();
+    await expect(page).toHaveURL(/\/tags$/);
+  });
+
   test('the active tab follows the page', async ({ page }) => {
     await page.goto('/locations');
     const tabs = page.getByRole('navigation', { name: 'Navegação principal' });
