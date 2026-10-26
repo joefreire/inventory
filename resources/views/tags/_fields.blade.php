@@ -13,12 +13,3 @@
     </div>
     @error('color')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
 </div>
-@push('scripts')
-<script>
-(function () {
-    const picker = document.getElementById('colorPicker'), text = document.getElementById('color');
-    picker.addEventListener('input', () => text.value = picker.value);
-    text.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(text.value)) picker.value = text.value; });
-})();
-</script>
-@endpush

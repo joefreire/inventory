@@ -26,8 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Location> $children
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Item> $items
  * @property-read string $full_path
- * @property-read int $item_count
- * @property-read int $total_item_count
+ * @property-read int|null $items_count withCount('items')
+ * @property int|null $items_total set by App\Locations\LocationTree
  */
 class Location extends Model
 {
@@ -36,7 +36,7 @@ class Location extends Model
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string>
+     * @var list<string>
      */
     protected $fillable = [
         'parent_id',
@@ -76,7 +76,7 @@ class Location extends Model
     /**
      * Get the parent location.
      *
-     * @return BelongsTo<Location, Location>
+     * @return BelongsTo<Location, $this>
      */
     public function parent(): BelongsTo
     {
@@ -86,7 +86,7 @@ class Location extends Model
     /**
      * Get the direct child locations.
      *
-     * @return HasMany<Location>
+     * @return HasMany<Location, $this>
      */
     public function children(): HasMany
     {
@@ -96,7 +96,7 @@ class Location extends Model
     /**
      * Get all items directly in this location.
      *
-     * @return HasMany<Item>
+     * @return HasMany<Item, $this>
      */
     public function items(): HasMany
     {
@@ -106,7 +106,7 @@ class Location extends Model
     /**
      * Get all children recursively (eager loading helper).
      *
-     * @return HasMany<Location>
+     * @return HasMany<Location, $this>
      */
     public function allChildren(): HasMany
     {
@@ -154,34 +154,12 @@ class Location extends Model
     }
 
     /**
-     * Get the count of items directly in this location.
-     */
-    public function getItemCountAttribute(): int
-    {
-        return $this->items()->count();
-    }
-
-    /**
-     * Get the total count of items including all descendants.
-     */
-    public function getTotalItemCountAttribute(): int
-    {
-        $count = $this->items()->count();
-
-        foreach ($this->children as $child) {
-            $count += $child->total_item_count;
-        }
-
-        return $count;
-    }
-
-    /**
      * Codigo curto e unico para a tag NFC (sem letras que confundem: 0/o, 1/l).
      */
     public static function newNfcCode(): string
     {
         do {
-            $code = substr(str_shuffle(str_repeat('23456789abcdefghjkmnpqrstuvwxyz', 4)), 0, 8);
+            $code = \App\Locations\NfcCode::random();
         } while (self::where('nfc_code', $code)->exists());
 
         return $code;

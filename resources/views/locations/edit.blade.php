@@ -13,7 +13,7 @@
     </form>
 
     <form action="{{ route('locations.destroy', $location) }}" method="POST" class="mt-4"
-          onsubmit="return confirm('Excluir a caixa {{ addslashes($location->name) }}? As caixas dentro dela também saem; as peças ficam sem caixa.');">
+          data-confirm="Excluir a caixa {{ $location->name }}? As caixas dentro dela também saem; as peças ficam sem caixa.">
         @csrf
         @method('DELETE')
         <button type="submit" class="btn btn-quiet text-danger w-100"><i class="bi bi-trash"></i> Excluir caixa</button>

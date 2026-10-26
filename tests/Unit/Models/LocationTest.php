@@ -70,17 +70,23 @@ class LocationTest extends TestCase
         $this->assertEquals('Escritorio', $ancestors[1]->name);
     }
 
-    public function test_total_item_count_includes_children(): void
+    public function test_tree_totals_include_children_in_one_query(): void
     {
         $parent = Location::create(['name' => 'Escritorio']);
         $child = Location::create(['name' => 'Gaveta', 'parent_id' => $parent->id]);
+        Location::create(['name' => 'Caixa', 'parent_id' => $child->id]);
 
         Item::create(['name' => 'Item 1', 'location_id' => $parent->id]);
         Item::create(['name' => 'Item 2', 'location_id' => $child->id]);
         Item::create(['name' => 'Item 3', 'location_id' => $child->id]);
 
-        $this->assertEquals(3, $parent->total_item_count);
-        $this->assertEquals(2, $child->total_item_count);
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        $roots = app(\App\Locations\LocationTree::class)->roots();
+        $this->assertCount(1, \Illuminate\Support\Facades\DB::getQueryLog());
+
+        $this->assertSame(3, $roots[0]->items_total);
+        $this->assertSame(2, $roots[0]->children[0]->items_total);
+        $this->assertSame(0, $roots[0]->children[0]->children[0]->items_total);
     }
 
     public function test_deleting_parent_deletes_children(): void

@@ -2,59 +2,39 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Item;
+
 /**
- * Form request for updating existing inventory items.
- *
- * Extends StoreItemRequest with additional rules for photo removal.
- * Inherits all validation rules and helper methods from parent.
+ * Editing a part: same fields as creating, quantity may reach 0 (part ran out)
+ * and chosen photos can be removed.
  */
 class UpdateItemRequest extends StoreItemRequest
 {
+    protected const MIN_QUANTITY = 0;
+
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * Extends parent rules with photo removal option.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
         return array_merge(parent::rules(), [
-            'remove_photo' => 'nullable|boolean',
-            'remove_media' => 'nullable|array',
-            'remove_media.*' => 'integer',
-            // na edicao a peca pode ter acabado
-            'quantity' => 'nullable|integer|min:0',
+            'remove_photo' => ['nullable', 'boolean'],
+            'remove_media' => ['nullable', 'array'],
+            'remove_media.*' => ['integer'],
         ]);
     }
 
     /**
-     * Check if the photo should be removed.
-     */
-    public function shouldRemovePhoto(): bool
-    {
-        return $this->boolean('remove_photo');
-    }
-
-    /**
-     * Check if a new photo was uploaded.
-     */
-    public function hasNewPhoto(): bool
-    {
-        return $this->hasFile('photo');
-    }
-
-    /**
-     * Ids das fotos a remover (remove_photo = todas, formato antigo).
+     * Ids of this item's photos to remove (`remove_photo` = all, older clients).
      *
-     * @return array<int, int>
+     * @return list<int>
      */
-    public function mediaToRemove(\App\Models\Item $item): array
+    public function mediaToRemove(Item $item): array
     {
-        if ($this->shouldRemovePhoto()) {
-            return $item->getMedia('photos')->pluck('id')->all();
+        if ($this->boolean('remove_photo')) {
+            return $item->getMedia('photos')->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
         }
 
-        return array_map('intval', (array) $this->input('remove_media', []));
+        return array_values(array_map('intval', (array) $this->validated('remove_media', [])));
     }
 }

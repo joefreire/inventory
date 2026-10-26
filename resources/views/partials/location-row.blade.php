@@ -4,8 +4,8 @@
         <span><span class="tape">{{ $location->name }}</span></span>
         @if($location->description)<span class="sub">{{ $location->description }}</span>@endif
     </span>
-    <span class="qty">{{ $location->total_item_count }}<small>pc</small></span>
+    <span class="qty">{{ $location->items_total }}<small>pc</small></span>
 </a>
-@foreach($location->allChildren ?? $location->children as $child)
+@foreach($location->children as $child)
     @include('partials.location-row', ['location' => $child, 'depth' => $depth + 1])
 @endforeach

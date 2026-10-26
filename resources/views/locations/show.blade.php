@@ -2,6 +2,7 @@
 
 @section('title', $location->name)
 @section('heading', 'Caixa')
+@section('page', 'location-show')
 @section('back', $location->parent ? route('locations.show', $location->parent) : route('locations.index'))
 
 @section('top-actions')
@@ -11,11 +12,12 @@
 @endsection
 
 @section('content')
-<div class="page">
+<div class="page" id="locationPage" data-location-id="{{ $location->id }}">
     <div class="page-head">
-        @if($location->ancestors())
+        @php $ancestors = $location->ancestors(); @endphp
+        @if($ancestors)
             <p class="small-muted mb-1">
-                @foreach($location->ancestors() as $ancestor)
+                @foreach($ancestors as $ancestor)
                     <a href="{{ route('locations.show', $ancestor) }}" class="text-muted">{{ $ancestor->name }}</a> /
                 @endforeach
             </p>
@@ -41,7 +43,7 @@
             @foreach($location->children as $child)
                 <a href="{{ route('locations.show', $child) }}" class="row-item">
                     <span class="grow"><span><span class="tape">{{ $child->name }}</span></span></span>
-                    <span class="qty">{{ $child->items->count() }}<small>pc</small></span>
+                    <span class="qty">{{ $child->items_count }}<small>pc</small></span>
                 </a>
             @endforeach
         </div>
@@ -127,57 +129,3 @@
 </div>
 @endsection
 
-@push('scripts')
-<script>
-(function () {
-    const url = document.getElementById('nfcUrl').value;
-
-    document.getElementById('nfcCopyBtn').addEventListener('click', async () => {
-        try {
-            await navigator.clipboard.writeText(url);
-            window.toast('Link copiado.');
-        } catch (e) {
-            document.getElementById('nfcUrl').select();
-            window.toast('Selecione e copie o link.', 'error');
-        }
-    });
-
-    if (window.nfc.supported) {
-        const btn = document.getElementById('nfcWriteBtn');
-        btn.classList.remove('d-none');
-        document.getElementById('nfcHelpNoWrite').classList.add('d-none');
-        btn.addEventListener('click', async () => {
-            btn.disabled = true;
-            window.toast('Encoste a tag vazia na parte de trás do celular.');
-            try {
-                await window.nfc.write(url);
-                window.toast('Tag gravada. Encoste de novo para testar.');
-            } catch (e) {
-                window.toast('Não gravou: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-            }
-        });
-    }
-
-    const filtro = document.getElementById('filtroGuardar');
-    filtro && filtro.addEventListener('input', () => {
-        const q = filtro.value.trim().toLowerCase();
-        document.querySelectorAll('#guardarItem [data-move]').forEach(b => {
-            b.classList.toggle('d-none', q && !b.dataset.nome.includes(q));
-        });
-    });
-
-    document.querySelectorAll('#guardarItem [data-move]').forEach(b => {
-        b.addEventListener('click', async () => {
-            try {
-                await window.api(b.dataset.move, 'PATCH', { location_id: {{ $location->id }} });
-                window.location.reload();
-            } catch (e) {
-                window.toast(e.message, 'error');
-            }
-        });
-    });
-})();
-</script>
-@endpush

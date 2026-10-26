@@ -4,91 +4,56 @@ namespace App\Services;
 
 use App\Models\Item;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Service class for managing inventory items.
- *
- * Handles business logic for item CRUD operations including
- * tag synchronization and media (photo) management.
+ * Writes on parts: create/update with tags and photos, move, quantity.
  */
 class ItemService
 {
     /**
-     * Create a new item with optional tags and photos (the first one is the main photo).
-     *
-     * @param  array<string, mixed>  $data  Validated item data
-     * @param  array<string>  $tagNames  Array of tag names to associate
-     * @param  array<int, UploadedFile>  $photos  Photos in display order
-     * @return Item The created item
+     * @param  array<string, mixed>  $data  validated attributes
+     * @param  list<string>  $tagNames
+     * @param  list<UploadedFile>  $photos  in display order (first = main)
      */
     public function create(array $data, array $tagNames = [], array $photos = []): Item
     {
-        $item = Item::create($data);
-
-        if (! empty($tagNames)) {
+        return DB::transaction(function () use ($data, $tagNames, $photos) {
+            $item = Item::create($data);
             $item->syncTags($tagNames);
-        }
+            $this->addPhotos($item, $photos);
 
-        foreach ($photos as $photo) {
-            $this->uploadPhoto($item, $photo);
-        }
-
-        return $item;
+            return $item;
+        });
     }
 
     /**
-     * Update an existing item with optional tags and photo changes.
-     *
-     * @param  Item  $item  The item to update
-     * @param  array<string, mixed>  $data  Validated item data
-     * @param  array<string>|null  $tagNames  Array of tag names (null to keep existing)
-     * @param  array<int, UploadedFile>  $newPhotos  Photos to add after the existing ones
-     * @param  array<int, int>  $removeMediaIds  Ids of this item's photos to remove
-     * @return Item The updated item
+     * @param  array<string, mixed>  $data  validated attributes
+     * @param  list<string>|null  $tagNames  null keeps the current tags
+     * @param  list<UploadedFile>  $newPhotos  added after the current ones
+     * @param  list<int>  $removeMediaIds  only this item's photos are removed
      */
-    public function update(
-        Item $item,
-        array $data,
-        ?array $tagNames = null,
-        array $newPhotos = [],
-        array $removeMediaIds = []
-    ): Item {
-        $item->update($data);
+    public function update(Item $item, array $data, ?array $tagNames = null, array $newPhotos = [], array $removeMediaIds = []): Item
+    {
+        return DB::transaction(function () use ($item, $data, $tagNames, $newPhotos, $removeMediaIds) {
+            $item->update($data);
+            if ($tagNames !== null) {
+                $item->syncTags($tagNames);
+            }
+            if ($removeMediaIds !== []) {
+                $item->getMedia('photos')->whereIn('id', $removeMediaIds)->each->delete();
+            }
+            $this->addPhotos($item, $newPhotos);
 
-        if ($tagNames !== null) {
-            $item->syncTags($tagNames);
-        }
-
-        if ($removeMediaIds) {
-            // so as fotos desta peca: id de outra peca e ignorado
-            $item->getMedia('photos')->whereIn('id', $removeMediaIds)->each->delete();
-        }
-
-        foreach ($newPhotos as $photo) {
-            $this->uploadPhoto($item, $photo);
-        }
-
-        return $item;
+            return $item;
+        });
     }
 
-    /**
-     * Delete an item and its associated media.
-     *
-     * @param  Item  $item  The item to delete
-     * @return bool True on success
-     */
     public function delete(Item $item): bool
     {
-        return $item->delete();
+        return (bool) $item->delete();
     }
 
-    /**
-     * Move an item to a different location.
-     *
-     * @param  Item  $item  The item to move
-     * @param  int|null  $locationId  The new location ID (null for no location)
-     * @return Item The updated item
-     */
     public function move(Item $item, ?int $locationId): Item
     {
         $item->update(['location_id' => $locationId]);
@@ -97,13 +62,26 @@ class ItemService
     }
 
     /**
-     * Upload a photo to an item's media collection.
-     *
-     * @param  Item  $item  The item to attach photo to
-     * @param  UploadedFile  $photo  The photo file
+     * Adds or removes units in one atomic UPDATE (two quick taps on + never
+     * overwrite each other) and never goes below zero.
      */
-    private function uploadPhoto(Item $item, UploadedFile $photo): void
+    public function adjustQuantity(Item $item, int $delta): int
     {
-        $item->addMedia($photo)->toMediaCollection('photos');
+        Item::whereKey($item->getKey())->update([
+            'quantity' => DB::raw('CASE WHEN quantity + '.(int) $delta.' < 0 THEN 0 ELSE quantity + '.(int) $delta.' END'),
+            'updated_at' => now(),
+        ]);
+
+        return (int) $item->refresh()->quantity;
+    }
+
+    /**
+     * @param  list<UploadedFile>  $photos
+     */
+    private function addPhotos(Item $item, array $photos): void
+    {
+        foreach ($photos as $photo) {
+            $item->addMedia($photo)->toMediaCollection('photos');
+        }
     }
 }

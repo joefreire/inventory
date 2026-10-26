@@ -38,6 +38,15 @@ return [
             'report' => false,
         ],
 
+        // Part photos (spatie/laravel-medialibrary): private, served by MediaController.
+        'media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/media'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

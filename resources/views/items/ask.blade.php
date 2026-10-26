@@ -2,18 +2,19 @@
 
 @section('title', 'Perguntar ao inventário')
 @section('heading', 'Perguntar')
+@section('page', 'item-ask')
 
 @section('content')
 <div class="page">
     <form action="{{ route('items.ask') }}" method="GET" class="search-bar" id="askForm">
         <div class="search-field">
             <i class="bi bi-search"></i>
-            <input type="search" name="q" class="form-control" value="{{ $pergunta }}" @if($pergunta === '') autofocus @endif
+            <input type="search" name="q" class="form-control" value="{{ $question }}" @if($question === '') autofocus @endif
                    placeholder="O que você precisa fazer?" enterkeyhint="search" autocomplete="off" aria-label="Pergunta">
         </div>
     </form>
 
-    @if($pergunta === '')
+    @if($question === '')
         <div class="mt-3">
             <h2 class="h2 mb-2">Descreva o que precisa</h2>
             <p class="lead-text mb-3">A IA olha cada peça do inventário e mostra as que servem, mesmo sem o nome certo.</p>
@@ -27,7 +28,7 @@
         <div class="panel mt-2">
             <h2 class="h3">A IA não respondeu</h2>
             <p class="small-muted mb-2">{{ $error }}</p>
-            <a href="{{ route('items.index', ['search' => $pergunta]) }}" class="btn btn-quiet">Buscar pelo texto</a>
+            <a href="{{ route('items.index', ['search' => $question]) }}" class="btn btn-quiet">Buscar pelo texto</a>
         </div>
     @elseif($results->isEmpty())
         <div class="empty">
@@ -61,14 +62,3 @@
 </div>
 @endsection
 
-@push('scripts')
-<script>
-// A busca leva alguns segundos: mostra que esta trabalhando
-document.getElementById('askForm').addEventListener('submit', function () {
-    const field = this.querySelector('.search-field');
-    if (!field.querySelector('.spinner-border')) {
-        field.insertAdjacentHTML('beforeend', '<span class="spinner-border spinner-border-sm text-muted" style="position:absolute;right:16px;top:50%;margin-top:-8px"></span>');
-    }
-});
-</script>
-@endpush

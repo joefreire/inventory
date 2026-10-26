@@ -2,112 +2,80 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\HandlesPhotoUploads;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
- * Form request for creating new inventory items.
- *
- * Handles validation of item data including name, description, category,
- * quantity, location, tags, photo upload, and AI metadata.
+ * Creating a part: fields, photos (the first is the main one) and the AI data
+ * that came from the analysis.
  */
 class StoreItemRequest extends FormRequest
 {
-    /** Fotos por peca. A IA usa as 4 primeiras (limite do modelo de decisao). */
-    public const MAX_FOTOS = 6;
+    use HandlesPhotoUploads;
 
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+    /** Photos per part. The AI uses the first ones (ItemAdvisor::MAX_PHOTOS). */
+    public const MAX_PHOTOS = 6;
+
+    public const MAX_QUANTITY = 1_000_000;
+
+    /** A new part has at least one unit; editing may go to 0 (UpdateItemRequest). */
+    protected const MIN_QUANTITY = 1;
+
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'ai_description' => 'nullable|string',
-            'category' => 'nullable|string|max:100',
-            'quantity' => 'nullable|integer|min:1',
-            'location_id' => 'nullable|exists:locations,id',
-            'notes' => 'nullable|string',
-            'tags' => 'nullable|string',
-            'photo' => 'nullable|image|max:10240',
-            // varias fotos da mesma peca (frente, verso, etiqueta)
-            'photos' => 'nullable|array|max:'.self::MAX_FOTOS,
-            'photos.*' => 'image|max:10240',
-            'ai_metadata' => 'nullable|json',
-        ];
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'ai_description' => ['nullable', 'string', 'max:2000'],
+            'category' => ['nullable', 'string', Rule::in(array_keys((array) config('ai.categories')))],
+            'quantity' => ['integer', 'min:'.static::MIN_QUANTITY, 'max:'.self::MAX_QUANTITY],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'tags' => ['nullable', 'string', 'max:500'],
+            'ai_metadata' => ['nullable', 'json', 'max:10000'],
+        ] + $this->photoRules(self::MAX_PHOTOS);
     }
 
-    /**
-     * Prepare the data for validation.
-     *
-     * Sets default quantity to 1 if not provided.
-     */
     protected function prepareForValidation(): void
     {
-        if (! $this->has('quantity') || $this->quantity === null) {
+        if ($this->input('quantity') === null || $this->input('quantity') === '') {
             $this->merge(['quantity' => 1]);
         }
     }
 
     /**
-     * Get the validated data with processed values.
-     *
-     * Decodes AI metadata JSON if present.
+     * Item attributes only (no files, tags or form flags).
      *
      * @return array<string, mixed>
      */
-    public function validatedWithProcessing(): array
+    public function itemData(): array
     {
-        $validated = $this->validated();
-
-        if (isset($validated['ai_metadata'])) {
-            $validated['ai_metadata'] = json_decode($validated['ai_metadata'], true);
+        $data = $this->safe()->only(['name', 'description', 'ai_description', 'category', 'quantity', 'location_id', 'notes']);
+        if ($this->filled('ai_metadata')) {
+            $data['ai_metadata'] = json_decode((string) $this->validated('ai_metadata'), true);
         }
 
-        return $validated;
+        return $data;
     }
 
     /**
-     * Parse the tags string into an array of trimmed tag names.
+     * Tag names typed as "a, b, c", trimmed, without empties or repeats.
      *
-     * @return array<string>
+     * @return list<string>
      */
-    public function getTagNames(): array
+    public function tagNames(): array
     {
-        $tags = $this->validated()['tags'] ?? '';
+        $names = array_map(fn ($t) => mb_substr(trim($t), 0, 40), explode(',', (string) $this->validated('tags')));
 
-        if (empty($tags)) {
-            return [];
-        }
-
-        return array_filter(
-            array_map('trim', explode(',', $tags)),
-            fn ($tag) => ! empty($tag)
-        );
-    }
-
-    /**
-     * Fotos enviadas, na ordem: `photos[]` e, por compatibilidade, `photo`.
-     *
-     * @return array<int, \Illuminate\Http\UploadedFile>
-     */
-    public function photoFiles(): array
-    {
-        $fotos = array_values(array_filter((array) $this->file('photos', [])));
-        if ($this->hasFile('photo')) {
-            array_unshift($fotos, $this->file('photo'));
-        }
-
-        return array_slice($fotos, 0, self::MAX_FOTOS);
+        return array_values(array_unique(array_filter($names, fn ($t) => $t !== '')));
     }
 }

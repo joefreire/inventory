@@ -169,7 +169,7 @@ class ItemControllerTest extends TestCase
 
     public function test_can_store_item_with_photo(): void
     {
-        Storage::fake('public');
+        Storage::fake('media');
 
         $response = $this->post(route('items.store'), [
             'name' => 'Item com foto',
@@ -249,7 +249,7 @@ class ItemControllerTest extends TestCase
 
     public function test_store_saves_several_photos_in_order(): void
     {
-        Storage::fake('public');
+        Storage::fake('media');
 
         $this->post(route('items.store'), [
             'name' => 'Rele 5V',
@@ -267,7 +267,7 @@ class ItemControllerTest extends TestCase
 
     public function test_update_removes_chosen_photo_and_adds_new_one(): void
     {
-        Storage::fake('public');
+        Storage::fake('media');
         $item = Item::create(['name' => 'Rele 5V']);
         $a = $item->addMedia(UploadedFile::fake()->image('a.jpg'))->toMediaCollection('photos');
         $item->addMedia(UploadedFile::fake()->image('b.jpg'))->toMediaCollection('photos');
@@ -286,7 +286,7 @@ class ItemControllerTest extends TestCase
 
     public function test_store_rejects_more_than_max_photos(): void
     {
-        Storage::fake('public');
+        Storage::fake('media');
         $fotos = array_map(fn ($i) => UploadedFile::fake()->image("f{$i}.jpg"), range(1, 7));
 
         $this->post(route('items.store'), ['name' => 'Muitas', 'photos' => $fotos])->assertSessionHasErrors('photos');

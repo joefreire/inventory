@@ -3,6 +3,7 @@
 @section('title', 'Nova tag')
 @section('back', route('tags.index'))
 @section('body-class', 'has-dock')
+@section('page', 'tag-form')
 
 @section('content')
 <div class="page">

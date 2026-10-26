@@ -3,6 +3,7 @@
 @section('title', 'Editar peça')
 @section('back', route('items.show', $item))
 @section('body-class', 'has-dock')
+@section('page', 'item-edit')
 
 @section('content')
 <div class="page">

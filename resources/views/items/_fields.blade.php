@@ -79,14 +79,3 @@
     @error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 
-@push('scripts')
-<script>
-window.addTag = function (nome) {
-    const input = document.getElementById('tags');
-    const atuais = input.value.split(',').map(t => t.trim()).filter(Boolean);
-    if (!atuais.some(t => t.toLowerCase() === nome.toLowerCase())) atuais.push(nome);
-    input.value = atuais.join(', ');
-};
-document.querySelectorAll('[data-add-tag]').forEach(b => b.addEventListener('click', () => window.addTag(b.dataset.addTag)));
-</script>
-@endpush

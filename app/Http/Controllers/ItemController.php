@@ -2,251 +2,150 @@
 
 namespace App\Http\Controllers;
 
+use App\Ai\Exceptions\AiException;
+use App\Ai\ItemAdvisor;
+use App\Ai\Search\NaturalSearch;
+use App\Http\Requests\AdjustQuantityRequest;
+use App\Http\Requests\AnalyzeItemRequest;
+use App\Http\Requests\MoveItemRequest;
 use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Models\Item;
 use App\Models\Location;
 use App\Models\Tag;
-use App\Services\Ai\AiException;
-use App\Services\Ai\ItemAdvisor;
-use App\Services\Ai\NaturalSearch;
+use App\Queries\ItemFilter;
 use App\Services\ItemService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 /**
- * Controller for managing inventory items.
- *
- * Handles CRUD operations, filtering, search, photo analysis,
- * and item movement between locations.
+ * Parts: list, form, AI analysis and natural language search, quick actions
+ * (quantity, move). Rules live in the requests, ItemService and App\Ai.
+ * AI failures (AiException) are rendered in bootstrap/app.php.
  */
 class ItemController extends Controller
 {
-    /**
-     * Create a new controller instance.
-     */
-    public function __construct(
-        private readonly ItemService $itemService
-    ) {}
+    private const PER_PAGE = 24;
 
-    /**
-     * Display a paginated list of items with filters.
-     */
+    public function __construct(private readonly ItemService $items) {}
+
     public function index(Request $request): View
     {
-        $query = Item::with(['location', 'tags', 'media']);
+        $filter = ItemFilter::fromRequest($request);
 
-        if ($request->filled('search')) {
-            $query->search($request->search);
-        }
-
-        if ($request->query('location_id') === 'nenhuma') {
-            $query->whereNull('location_id');
-        } elseif ($request->filled('location_id')) {
-            $query->inLocation((int) $request->location_id);
-        }
-
-        if ($request->filled('tag_id')) {
-            $query->withTag($request->tag_id);
-        }
-
-        if ($request->filled('category')) {
-            $query->inCategory($request->category);
-        }
-
-        $items = $query->latest()->paginate(24)->withQueryString();
-
-        $locations = Location::whereNull('parent_id')->with('allChildren')->get();
-        $locationsFlat = Location::orderBy('path')->get(['id', 'name', 'path']);
-        $semCaixa = Item::whereNull('location_id')->count();
-        $tags = Tag::withCount('items')->orderBy('name')->get();
-        $categories = Item::whereNotNull('category')
-            ->distinct()
-            ->pluck('category')
-            ->sort()
-            ->values();
-
-        return view('items.index', compact('items', 'locations', 'locationsFlat', 'semCaixa', 'tags', 'categories'));
+        return view('items.index', [
+            'items' => $filter->apply(Item::query()->with(['location:id,name,path', 'media']))
+                ->latest()->paginate(self::PER_PAGE)->withQueryString(),
+            'filter' => $filter,
+            'locationsFlat' => Location::orderBy('path')->get(['id', 'name', 'path']),
+            'withoutLocationCount' => Item::whereNull('location_id')->count(),
+            'tags' => Tag::withCount('items')->orderBy('name')->get(),
+            'categories' => Item::whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
+        ]);
     }
 
-    /**
-     * Show the form for creating a new item.
-     */
     public function create(Request $request): View
     {
-        $locations = Location::orderBy('path')->get();
-        $tags = Tag::orderBy('name')->get();
-        $locationId = $request->integer('location_id') ?: null;
-
-        return view('items.create', compact('locations', 'tags', 'locationId'));
+        return view('items.create', ['locationId' => $request->integer('location_id') ?: null]);
     }
 
-    /**
-     * Store a newly created item.
-     */
     public function store(StoreItemRequest $request): RedirectResponse
     {
-        $item = $this->itemService->create(
-            $request->validatedWithProcessing(),
-            $request->getTagNames(),
-            $request->photoFiles()
-        );
+        $item = $this->items->create($request->itemData(), $request->tagNames(), $request->photoFiles(StoreItemRequest::MAX_PHOTOS));
 
-        // "Salvar e proxima": volta ao cadastro na mesma caixa (cadastro em sequencia)
+        // "Salvar e próxima": back to the form in the same box (registering in sequence)
         if ($request->boolean('proxima')) {
             return redirect()
                 ->route('items.create', array_filter(['location_id' => $item->location_id]))
                 ->with('success', "Peça salva: {$item->name}. Pode tirar a próxima foto.");
         }
 
-        return redirect()
-            ->route('items.show', $item)
-            ->with('success', 'Peça salva.');
+        return redirect()->route('items.show', $item)->with('success', 'Peça salva.');
     }
 
-    /**
-     * Display the specified item.
-     */
     public function show(Item $item): View
     {
-        $item->load(['location', 'tags', 'media']);
-        $locations = Location::orderBy('path')->get(['id', 'name', 'path']);
-
-        return view('items.show', compact('item', 'locations'));
+        return view('items.show', ['item' => $item->load(['location', 'tags', 'media'])]);
     }
 
-    /**
-     * Show the form for editing the specified item.
-     */
     public function edit(Item $item): View
     {
-        $item->load(['location', 'tags', 'media']);
-        $locations = Location::orderBy('path')->get();
-        $tags = Tag::orderBy('name')->get();
-
-        return view('items.edit', compact('item', 'locations', 'tags'));
+        return view('items.edit', ['item' => $item->load(['location', 'tags', 'media'])]);
     }
 
-    /**
-     * Update the specified item.
-     */
     public function update(UpdateItemRequest $request, Item $item): RedirectResponse
     {
-        $this->itemService->update(
+        $this->items->update(
             $item,
-            $request->validated(),
-            $request->getTagNames(),
-            $request->photoFiles(),
-            $request->mediaToRemove($item)
+            $request->itemData(),
+            $request->tagNames(),
+            $request->photoFiles(StoreItemRequest::MAX_PHOTOS),
+            $request->mediaToRemove($item),
         );
 
-        return redirect()
-            ->route('items.show', $item)
-            ->with('success', 'Alterações salvas.');
+        return redirect()->route('items.show', $item)->with('success', 'Alterações salvas.');
     }
 
-    /**
-     * Remove the specified item.
-     */
     public function destroy(Item $item): RedirectResponse
     {
-        $this->itemService->delete($item);
+        $this->items->delete($item);
 
-        return redirect()
-            ->route('items.index')
-            ->with('success', 'Peça excluída.');
+        return redirect()->route('items.index')->with('success', 'Peça excluída.');
     }
 
     /**
-     * Sugere o cadastro pela foto e/ou pelo que já foi digitado: nome,
-     * descrição, specs, categoria, tags, caixa e se a peça já existe.
+     * Suggestion from the photos and/or what was typed: name, description, specs,
+     * category, tags, box and whether the part already exists.
      */
-    public function analyze(Request $request, ItemAdvisor $advisor): JsonResponse
+    public function analyze(AnalyzeItemRequest $request, ItemAdvisor $advisor): JsonResponse
     {
-        $request->validate([
-            'photo' => 'nullable|image|max:10240',
-            'photos' => 'nullable|array|max:'.ItemAdvisor::MAX_FOTOS_IA,
-            'photos.*' => 'image|max:10240',
-            'name' => 'nullable|required_without_all:photo,photos|string|max:255',
-            'description' => 'nullable|string|max:1000',
-        ]);
+        $advice = $advisor->advise(
+            $request->photoPaths(),
+            (string) $request->validated('name'),
+            (string) $request->validated('description'),
+        );
 
-        $fotos = array_values(array_filter((array) $request->file('photos', [])));
-        if ($request->hasFile('photo')) {
-            array_unshift($fotos, $request->file('photo'));
-        }
-
-        try {
-            $result = $advisor->analyze(
-                array_map(fn ($f) => $f->getRealPath(), $fotos),
-                $request->only('name', 'description')
-            );
-        } catch (AiException $e) {
-            Log::warning('IA: falha ao analisar item', ['error' => $e->getMessage()]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'A IA não respondeu: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['success' => true, 'data' => $result]);
+        return response()->json(['success' => true, 'data' => $advice]);
     }
 
     /**
-     * Busca em linguagem natural ("tenho algo pra medir temperatura?").
+     * Natural language search ("tenho algo pra medir temperatura?").
      */
     public function ask(Request $request, NaturalSearch $search): View
     {
-        $pergunta = trim((string) $request->query('q', ''));
+        $question = trim(mb_substr((string) $request->query('q', ''), 0, 300));
+
         $results = collect();
         $error = null;
-
-        if ($pergunta !== '') {
+        if ($question !== '') {
             try {
-                $results = $search->search($pergunta);
+                $results = $search->search($question);
             } catch (AiException $e) {
-                Log::warning('IA: falha na busca', ['error' => $e->getMessage()]);
+                report($e);
                 $error = 'A IA não respondeu: '.$e->getMessage();
             }
         }
 
-        return view('items.ask', compact('pergunta', 'results', 'error'));
+        return view('items.ask', compact('question', 'results', 'error'));
     }
 
-    /**
-     * Soma ou tira unidades (botoes + e - da tela do item). Nunca fica negativo.
-     */
-    public function quantity(Request $request, Item $item): JsonResponse
+    public function quantity(AdjustQuantityRequest $request, Item $item): JsonResponse
     {
-        $validated = $request->validate(['delta' => 'required|integer|between:-1000,1000|not_in:0']);
-
-        $item->update(['quantity' => max(0, $item->quantity + (int) $validated['delta'])]);
+        $quantity = $this->items->adjustQuantity($item, $request->delta());
 
         return response()->json([
             'success' => true,
-            'quantity' => $item->quantity,
-            'message' => "{$item->quantity} ".($item->quantity === 1 ? 'unidade' : 'unidades'),
+            'quantity' => $quantity,
+            'message' => $quantity.' '.($quantity === 1 ? 'unidade' : 'unidades'),
         ]);
     }
 
-    /**
-     * Move an item to a different location.
-     */
-    public function move(Request $request, Item $item): JsonResponse
+    public function move(MoveItemRequest $request, Item $item): JsonResponse
     {
-        $validated = $request->validate([
-            'location_id' => 'nullable|exists:locations,id',
-        ]);
+        $this->items->move($item, $request->locationId());
 
-        $this->itemService->move($item, $validated['location_id'] ?? null);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Peça guardada.',
-        ]);
+        return response()->json(['success' => true, 'message' => 'Peça guardada.']);
     }
 }

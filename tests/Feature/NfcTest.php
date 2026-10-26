@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\NfcController;
+use App\Locations\NfcCode;
 use App\Models\Item;
 use App\Models\Location;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,10 +67,10 @@ class NfcTest extends TestCase
 
     public function test_code_from_tag(): void
     {
-        $this->assertSame('ab12cd34', NfcController::codeFromTag('http://192.168.0.10:8000/n/ab12cd34'));
-        $this->assertSame('ab12cd34', NfcController::codeFromTag('https://inv.exemplo/n/AB12CD34/?x=1'));
-        $this->assertSame('ab12cd34', NfcController::codeFromTag(' ab12cd34 '));
-        $this->assertNull(NfcController::codeFromTag('https://exemplo.com/outra/coisa'));
+        $this->assertSame('ab12cd34', NfcCode::fromScanned('http://192.168.0.10:8000/n/ab12cd34'));
+        $this->assertSame('ab12cd34', NfcCode::fromScanned('https://inv.exemplo/n/AB12CD34/?x=1'));
+        $this->assertSame('ab12cd34', NfcCode::fromScanned(' ab12cd34 '));
+        $this->assertNull(NfcCode::fromScanned('https://exemplo.com/outra/coisa'));
     }
 
     public function test_create_item_preselects_location_from_query(): void
@@ -89,5 +89,20 @@ class NfcTest extends TestCase
 
         $this->assertSame("https://inventario.exemplo/n/{$location->nfc_code}", $location->nfc_url);
         $this->get(route('locations.show', $location))->assertDontSee('NFC_BASE_URL não definido');
+    }
+
+    public function test_read_tag_tab_resolves_scanned_text_to_box(): void
+    {
+        $location = Location::create(['name' => 'Caixa ESPs']);
+
+        $this->get(route('nfc.resolve', ['tag' => $location->nfc_url]))->assertRedirect(route('nfc.open', $location->nfc_code));
+        $this->get(route('nfc.resolve', ['tag' => 'https://outro.site/qualquer']))->assertRedirect(route('items.index'));
+    }
+
+    public function test_random_codes_use_the_safe_alphabet(): void
+    {
+        foreach (range(1, 50) as $i) {
+            $this->assertMatchesRegularExpression('/^[2-9a-hjkmnp-z]{8}$/', NfcCode::random());
+        }
     }
 }

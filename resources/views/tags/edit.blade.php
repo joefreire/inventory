@@ -3,6 +3,7 @@
 @section('title', 'Editar tag')
 @section('back', route('tags.show', $tag))
 @section('body-class', 'has-dock')
+@section('page', 'tag-form')
 
 @section('content')
 <div class="page">
@@ -13,7 +14,7 @@
     </form>
     <p class="small-muted mx-1">Usada em {{ $tag->items()->count() }} peças.</p>
     <form action="{{ route('tags.destroy', $tag) }}" method="POST" class="mt-4"
-          onsubmit="return confirm('Excluir a tag {{ addslashes($tag->name) }}? As peças continuam, só perdem a tag.');">
+          data-confirm="Excluir a tag {{ $tag->name }}? As peças continuam, só perdem a tag.">
         @csrf
         @method('DELETE')
         <button type="submit" class="btn btn-quiet text-danger w-100"><i class="bi bi-trash"></i> Excluir tag</button>

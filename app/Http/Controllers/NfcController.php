@@ -2,54 +2,52 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\NfcScanRequest;
+use App\Locations\NfcCode;
 use App\Models\Item;
 use App\Models\Location;
 use App\Services\ItemService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 
 /**
- * Tags NFC das caixas.
- *
- * A tag guarda só um link /n/{codigo}. Encostar o celular (Android ou iPhone)
- * abre a página da caixa. No Android, o app também le a tag pelo navegador
- * (Web NFC) para mover um item para a caixa encostada.
+ * Box NFC tags. The tag holds only the link /n/{code}: touching the phone opens
+ * the box (Android and iPhone). On Android the app also reads tags in the
+ * browser (Web NFC) and sends the raw text here; NfcCode reads it, so the code
+ * format lives in one place.
  */
 class NfcController extends Controller
 {
-    public function __construct(
-        private readonly ItemService $itemService
-    ) {}
+    public function __construct(private readonly ItemService $items) {}
 
-    /**
-     * Abre a caixa da tag.
-     */
+    /** Link written on the tag. */
     public function open(string $code): RedirectResponse
     {
-        $location = Location::where('nfc_code', $code)->firstOrFail();
-
-        return redirect()->route('locations.show', $location);
+        return redirect()->route('locations.show', $this->box($code));
     }
 
-    /**
-     * Move o item para a caixa cuja tag foi lida (link ou codigo).
-     */
-    public function moveItem(Request $request, Item $item): JsonResponse
+    /** "Ler tag" tab: whatever the phone read (link or code) -> the box. */
+    public function resolve(NfcScanRequest $request): RedirectResponse
     {
-        $validated = $request->validate(['tag' => 'required|string|max:500']);
-
-        $code = self::codeFromTag($validated['tag']);
-        $location = $code ? Location::where('nfc_code', $code)->first() : null;
-
-        if (! $location) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Essa tag não e de nenhuma caixa do inventário.',
-            ], 404);
+        $code = NfcCode::fromScanned($request->scanned());
+        if ($code === null || ! Location::where('nfc_code', $code)->exists()) {
+            return redirect()->route('items.index')->with('error', 'Essa tag não é de nenhuma caixa do inventário.');
         }
 
-        $this->itemService->move($item, $location->id);
+        return redirect()->route('nfc.open', $code);
+    }
+
+    /** "Guardar: encostar na caixa": stores the item in the box whose tag was read. */
+    public function moveItem(NfcScanRequest $request, Item $item): JsonResponse
+    {
+        $code = NfcCode::fromScanned($request->scanned());
+        $location = $code === null ? null : Location::where('nfc_code', $code)->first();
+
+        if (! $location) {
+            return response()->json(['success' => false, 'message' => 'Essa tag não é de nenhuma caixa do inventário.'], 404);
+        }
+
+        $this->items->move($item, $location->id);
 
         return response()->json([
             'success' => true,
@@ -58,16 +56,8 @@ class NfcController extends Controller
         ]);
     }
 
-    /**
-     * Extrai o codigo de ".../n/abc123" ou do proprio codigo.
-     */
-    public static function codeFromTag(string $tag): ?string
+    private function box(string $code): Location
     {
-        $tag = trim($tag);
-        if (preg_match('#/n/([a-z0-9]{4,16})/?(?:[?\#].*)?$#i', $tag, $m)) {
-            return strtolower($m[1]);
-        }
-
-        return preg_match('/^[a-z0-9]{4,16}$/i', $tag) ? strtolower($tag) : null;
+        return Location::where('nfc_code', strtolower($code))->firstOrFail();
     }
 }

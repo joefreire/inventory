@@ -17,9 +17,13 @@
 @endsection
 
 @php $specs = $item->specList(); @endphp
+@section('page', 'item-show')
 
 @section('content')
-<div class="page">
+<div class="page" id="itemPage"
+     data-quantity-url="{{ route('items.quantity', $item) }}"
+     data-move-url="{{ route('items.move', $item) }}"
+     data-nfc-move-url="{{ route('items.nfc-move', $item) }}">
     @php $fotos = $item->getMedia('photos'); @endphp
     @if($fotos->isNotEmpty())
         <div class="gallery" id="gallery">
@@ -142,7 +146,7 @@
     <div class="offcanvas-body p-0 py-2">
         <a href="{{ route('items.edit', $item) }}" class="sheet-action"><i class="bi bi-pencil"></i> Editar peça</a>
         <form action="{{ route('items.destroy', $item) }}" method="POST"
-              onsubmit="return confirm('Excluir {{ addslashes($item->name) }}? Não dá para desfazer.');">
+              data-confirm="Excluir {{ $item->name }}? Não dá para desfazer.">
             @csrf
             @method('DELETE')
             <button type="submit" class="sheet-action danger"><i class="bi bi-trash"></i> Excluir peça</button>
@@ -151,65 +155,3 @@
 </div>
 @endsection
 
-@push('scripts')
-<script>
-(function () {
-    // bolinhas da galeria acompanham a foto visivel
-    const gal = document.getElementById('gallery'), dots = document.getElementById('galleryDots');
-    if (gal && dots) {
-        gal.addEventListener('scroll', () => {
-            const i = Math.round(gal.scrollLeft / gal.clientWidth);
-            dots.querySelectorAll('span').forEach((d, j) => d.classList.toggle('on', i === j));
-        }, { passive: true });
-    }
-
-    const qtyValue = document.getElementById('qtyValue');
-    const qtyLabel = document.getElementById('qtyLabel');
-    let pendente = Promise.resolve();
-
-    document.querySelectorAll('.stepper [data-delta]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const delta = Number(btn.dataset.delta);
-            const antes = Number(qtyValue.textContent);
-            if (antes + delta < 0) return;
-            // mostra na hora; o servidor confirma em seguida (fila para não embaralhar toques rapidos)
-            qtyValue.textContent = antes + delta;
-            if (navigator.vibrate) navigator.vibrate(8);
-            pendente = pendente.then(() => window.api('{{ route('items.quantity', $item) }}', 'PATCH', { delta }))
-                .then(r => {
-                    qtyValue.textContent = r.quantity;
-                    qtyLabel.textContent = r.quantity === 1 ? 'unidade' : 'unidades';
-                })
-                .catch(e => { qtyValue.textContent = antes; window.toast(e.message, 'error'); });
-        });
-    });
-
-    document.querySelectorAll('#trocarCaixa [data-location]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            try {
-                await window.api('{{ route('items.move', $item) }}', 'PATCH', { location_id: Number(btn.dataset.location) });
-                window.location.reload();
-            } catch (e) {
-                window.toast(e.message, 'error');
-            }
-        });
-    });
-
-    if (window.nfc.supported) {
-        const nfcBtn = document.getElementById('nfcMoveBtn');
-        nfcBtn.classList.remove('d-none');
-        nfcBtn.addEventListener('click', async () => {
-            const tag = await window.nfc.readWithSheet('Guardar nesta caixa');
-            if (!tag) return;
-            try {
-                const r = await window.api('{{ route('items.nfc-move', $item) }}', 'POST', { tag });
-                window.toast(r.message);
-                setTimeout(() => window.location.reload(), 700);
-            } catch (e) {
-                window.toast(e.message, 'error');
-            }
-        });
-    }
-})();
-</script>
-@endpush

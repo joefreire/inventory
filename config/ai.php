@@ -79,4 +79,24 @@ return [
 
     // No maximo quantas tags a IA sugere por peca (existentes + novas).
     'max_tags' => 5,
+
+    // Perguntas feitas ao modelo de decisao em cada analise de peca, numa
+    // chamada so. Pergunta nova = classe que implementa
+    // App\Ai\Decisions\PartDecision, listada aqui.
+    'decisions' => [
+        App\Ai\Decisions\CategoryDecision::class,
+        App\Ai\Decisions\TagsDecision::class,
+        App\Ai\Decisions\LocationDecision::class,
+        App\Ai\Decisions\DuplicateDecision::class,
+    ],
+
+    // Busca em linguagem natural: quantos itens no maximo sao avaliados (os
+    // mudados mais recentemente) e por quanto tempo a mesma pergunta fica em cache.
+    'search' => [
+        'max_items' => (int) env('AI_SEARCH_MAX_ITEMS', 500),
+        'cache_minutes' => 10,
+    ],
+
+    // Limite de chamadas a IA por usuario por minuto (custo e abuso).
+    'rate_limit_per_minute' => (int) env('AI_RATE_LIMIT', 20),
 ];

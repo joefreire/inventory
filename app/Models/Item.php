@@ -25,7 +25,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $category
  * @property int $quantity
  * @property string|null $notes
- * @property array|null $ai_metadata
+ * @property array<string, mixed>|null $ai_metadata
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Location|null $location
@@ -48,7 +48,7 @@ class Item extends Model implements HasMedia
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string>
+     * @var list<string>
      */
     protected $fillable = [
         'location_id',
@@ -74,7 +74,7 @@ class Item extends Model implements HasMedia
     /**
      * Get the location that contains this item.
      *
-     * @return BelongsTo<Location, Item>
+     * @return BelongsTo<Location, $this>
      */
     public function location(): BelongsTo
     {
@@ -84,7 +84,7 @@ class Item extends Model implements HasMedia
     /**
      * Get the tags associated with this item.
      *
-     * @return BelongsToMany<Tag>
+     * @return BelongsToMany<Tag, $this>
      */
     public function tags(): BelongsToMany
     {
@@ -97,7 +97,7 @@ class Item extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('photos')
-            ->useDisk('public');
+            ->useDisk('media');
     }
 
     /**
@@ -108,16 +108,16 @@ class Item extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->nonQueued()
             ->width(200)
             ->height(200)
-            ->sharpen(10)
-            ->nonQueued();
+            ->sharpen(10);
 
         $this->addMediaConversion('preview')
+            ->nonQueued()
             ->width(800)
             ->height(800)
-            ->sharpen(5)
-            ->nonQueued();
+            ->sharpen(5);
     }
 
     /**

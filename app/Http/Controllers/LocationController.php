@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
 use App\Models\Item;
+use App\Locations\LocationTree;
 use App\Models\Location;
 use App\Services\LocationService;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,8 @@ class LocationController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        private readonly LocationService $locationService
+        private readonly LocationService $locationService,
+        private readonly LocationTree $tree,
     ) {}
 
     /**
@@ -32,13 +34,7 @@ class LocationController extends Controller
      */
     public function index(): View
     {
-        $locations = Location::whereNull('parent_id')
-            ->with('allChildren')
-            ->withCount('items')
-            ->orderBy('name')
-            ->get();
-
-        return view('locations.index', compact('locations'));
+        return view('locations.index', ['locations' => $this->tree->roots()]);
     }
 
     /**
@@ -70,16 +66,16 @@ class LocationController extends Controller
      */
     public function show(Location $location): View
     {
-        $location->load(['items.media', 'items.tags', 'children.items']);
+        $location->load(['parent', 'children' => fn ($q) => $q->withCount('items')->orderBy('name')]);
 
         $items = $location->items()
-            ->with(['media', 'tags'])
+            ->with('media')
             ->latest()
             ->paginate(24);
 
         // Para "Guardar item aqui" (iPhone: a tag abre esta página)
         $otherItems = Item::where(fn ($q) => $q->whereNull('location_id')->orWhere('location_id', '!=', $location->id))
-            ->with('location')
+            ->with('location:id,name')
             ->orderBy('name')
             ->limit(500)
             ->get(['id', 'name', 'location_id']);
