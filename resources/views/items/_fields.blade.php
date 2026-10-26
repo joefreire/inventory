@@ -1,8 +1,8 @@
 {{-- Campos da peca, usados no cadastro e na edicao. Espera $locations, $tags e, na edicao, $item. --}}
 @php
     $item = $item ?? null;
-    $categorias = config('ai.categories');
-    $categoriaAtual = old('category', $item?->category);
+    $categoryOptions = config('ai.categories');
+    $currentCategory = old('category', $item?->category);
 @endphp
 
 <div class="mb-3">
@@ -17,11 +17,11 @@
         <label for="category" class="form-label">Categoria</label>
         <select class="form-select @error('category') is-invalid @enderror" id="category" name="category">
             <option value="">Escolher...</option>
-            @foreach($categorias as $chave => $rotulo)
-                <option value="{{ $chave }}" {{ $categoriaAtual === $chave ? 'selected' : '' }}>{{ \Illuminate\Support\Str::before($rotulo, ' (') }}</option>
+            @foreach($categoryOptions as $chave => $rotulo)
+                <option value="{{ $chave }}" {{ $currentCategory === $chave ? 'selected' : '' }}>{{ \Illuminate\Support\Str::before($rotulo, ' (') }}</option>
             @endforeach
-            @if($categoriaAtual && !isset($categorias[$categoriaAtual]))
-                <option value="{{ $categoriaAtual }}" selected>{{ $categoriaAtual }}</option>
+            @if($currentCategory && !isset($categoryOptions[$currentCategory]))
+                <option value="{{ $currentCategory }}" selected>{{ $currentCategory }}</option>
             @endif
         </select>
         @error('category')<div class="invalid-feedback">{{ $message }}</div>@enderror

@@ -1,302 +1,95 @@
-# Architecture
+# Arquitetura
 
-This document describes the system architecture and design decisions.
+Inventário pessoal de peças eletrônicas, usado quase sempre no celular.
+Laravel 12 (PHP 8.4), SQLite, Blade + JS em módulos (Vite), IA no Ollama Cloud.
 
-## Overview
-
-The Inventory Management System follows a traditional MVC (Model-View-Controller) architecture with additional service layer for complex business logic.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Client                                │
-│                    (Web Browser)                             │
-└─────────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      HTTP Layer                              │
-│                  (Laravel Router)                            │
-└─────────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Controllers                              │
-│          ItemController, LocationController, etc.            │
-└─────────────────────────────────────────────────────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│  Form Requests  │ │  Services   │ │     Models      │
-│   (Validation)  │ │  (Logic)    │ │   (Eloquent)    │
-└─────────────────┘ └─────────────┘ └─────────────────┘
-                             │              │
-                             └──────┬───────┘
-                                    ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       Database                               │
-│                (SQLite / MySQL / PostgreSQL)                 │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Design Principles
-
-### Single Responsibility Principle (SRP)
-
-Each class has one reason to change:
-
-- **Controllers**: Handle HTTP requests and responses
-- **Form Requests**: Validate incoming data
-- **Services**: Contain business logic
-- **Models**: Represent data and relationships
-
-### Don't Repeat Yourself (DRY)
-
-Common code is extracted into reusable components:
-
-- **Traits**: `HasPhotoUrls`, `HasDescendants` for shared model behavior
-- **Form Requests**: Validation rules shared between store/update
-- **Services**: Business logic reused across controllers
-
-### Keep It Simple, Stupid (KISS)
-
-- Simple controller methods that delegate to services
-- Straightforward data flow
-- Minimal dependencies between components
-
-## Directory Structure
+## Camadas
 
 ```
-app/
-├── Http/
-│   ├── Controllers/
-│   │   ├── ItemController.php       # Item CRUD + analyze + move
-│   │   ├── LocationController.php   # Location CRUD + tree
-│   │   └── TagController.php        # Tag CRUD + search
-│   └── Requests/
-│       ├── StoreItemRequest.php     # Item creation validation
-│       ├── UpdateItemRequest.php    # Item update validation
-│       ├── StoreLocationRequest.php # Location creation validation
-│       ├── UpdateLocationRequest.php# Location update + cycle check
-│       ├── StoreTagRequest.php      # Tag creation validation
-│       └── UpdateTagRequest.php     # Tag update validation
-├── Models/
-│   ├── Item.php                     # Item model with scopes
-│   ├── Location.php                 # Location with tree methods
-│   ├── Tag.php                      # Tag with color generation
-│   └── Traits/
-│       ├── HasPhotoUrls.php         # Photo URL accessor methods
-│       └── HasDescendants.php       # Tree traversal methods
-└── Services/
-    ├── ItemService.php              # Item business logic
-    ├── LocationService.php          # Location tree operations
-    └── OpenAIVisionService.php      # AI image analysis
+HTTP        routes/web.php ─► Controllers (finos) ─► FormRequests (validação, autorização)
+                                     │
+Domínio     Services (escrita: ItemService)   Queries (leitura: ItemFilter)
+            Locations (NfcCode, LocationTree)  Tags (TagNormalizer)  Media (URL privada)
+                                     │
+IA          App\Ai\ItemAdvisor ─► PartIdentifier ─► Contracts\VisionModel ──► Ollama\OllamaVisionModel
+                     │                                                         (cadeia de modelos)
+                     └─► Decisions\* (PartDecision) ─► Contracts\DecisionModel ─► Ollama\OllamaDecisionModel
+            App\Ai\Search\NaturalSearch ─────────────► Contracts\DecisionModel
+                                     │
+Dados       Models (Item, Location, Tag) + spatie/laravel-medialibrary (fotos)
 ```
 
-## Data Model
+Regras do projeto:
 
-### Entity Relationship Diagram
+- **Controller não tem regra.** Lê do FormRequest, chama um serviço, devolve view/JSON.
+- **Validação e autorização no FormRequest.** `authorize()` exige usuário logado.
+- **Escrita em Services, leitura em Queries.** `ItemService` faz transação; quantidade é
+  um `UPDATE` atômico (dois toques rápidos no + não se perdem).
+- **Uma regra, um lugar.** Formato do código NFC: `App\Locations\NfcCode` (o JS só manda
+  o texto lido). Tags genéricas e variações: `App\Tags\TagNormalizer`. Limites e
+  categorias: `config/ai.php`.
+- **Código em inglês, interface em português.**
 
-```
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│   Location   │       │     Item     │       │     Tag      │
-├──────────────┤       ├──────────────┤       ├──────────────┤
-│ id           │───┐   │ id           │   ┌───│ id           │
-│ parent_id    │   │   │ location_id  │◄──┘   │ name         │
-│ name         │   └──►│ name         │       │ color        │
-│ description  │       │ description  │       └──────────────┘
-│ path         │       │ ai_description│             ▲
-│ depth        │       │ category     │             │
-└──────────────┘       │ quantity     │       ┌──────────────┐
-      │                │ notes        │       │   item_tag   │
-      │                │ ai_metadata  │       ├──────────────┤
-      ▼                └──────────────┘       │ item_id      │◄──┐
-┌──────────────┐              │              │ tag_id       │   │
-│   Location   │              │              └──────────────┘   │
-│  (children)  │              └─────────────────────────────────┘
-└──────────────┘
+## IA (app/Ai)
 
-┌──────────────┐
-│    Media     │
-├──────────────┤
-│ id           │
-│ model_id     │◄─── Item.id
-│ model_type   │
-│ collection   │
-│ file_name    │
-│ disk         │
-└──────────────┘
-```
+O resto do app depende só dos **contratos** `VisionModel` e `DecisionModel`.
+Trocar de provedor = outra classe que implementa o contrato + o bind em
+`App\Providers\AiServiceProvider`.
 
-### Tables
+| Peça | Papel |
+|---|---|
+| `Identification\PartIdentifier` | fotos (+ o que foi digitado) → `PartDescription` tipada. Prompt em `resources/prompts/identify-part.md` |
+| `Decisions\PartDecision` | contrato de uma pergunta fechada ao modelo de decisão |
+| `Decisions\CategoryDecision`, `TagsDecision`, `LocationDecision`, `DuplicateDecision` | uma classe por pergunta |
+| `ItemAdvisor` | orquestra: identifica, junta as perguntas de todas as decisões numa chamada só, interpreta |
+| `Search\NaturalSearch` | "tenho algo pra…": um sim/não por item, com limite de itens e cache |
 
-#### items
-| Column | Type | Description |
-|--------|------|-------------|
-| id | bigint | Primary key |
-| location_id | bigint | Foreign key to locations |
-| name | varchar(255) | Item name |
-| description | text | User description |
-| ai_description | text | AI-generated description |
-| category | varchar(100) | Item category |
-| quantity | integer | Stock quantity |
-| notes | text | Additional notes |
-| ai_metadata | json | AI analysis data |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+**Pergunta nova** (ex.: "precisa de cuidado com ESD?"): classe que implementa
+`PartDecision`, listada em `config/ai.php` → `decisions`. Vai na mesma chamada,
+sem custo de ida e volta extra, e aparece na resposta da análise com a chave `key()`.
 
-#### locations
-| Column | Type | Description |
-|--------|------|-------------|
-| id | bigint | Primary key |
-| parent_id | bigint | Self-referencing FK |
-| name | varchar(255) | Location name |
-| description | text | Location description |
-| path | varchar(500) | Full path (auto-generated) |
-| depth | integer | Tree depth (auto-calculated) |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+## Segurança
 
-#### tags
-| Column | Type | Description |
-|--------|------|-------------|
-| id | bigint | Primary key |
-| name | varchar(100) | Tag name (unique) |
-| color | varchar(7) | Hex color (#RRGGBB) |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+| Ameaça | Proteção |
+|---|---|
+| Acesso sem login | todas as rotas atrás de `auth`; sem cadastro aberto; usuário por `php artisan inventario:usuario` |
+| Força bruta no login | 5 erros por e-mail+IP bloqueiam 1 min (`LoginRequest`) + 10/min por IP (`throttle:login`) |
+| Fotos vazando | disco privado `media`; URLs passam por `MediaController` (com login). Antes: `/storage/{id}` público |
+| XSS | Blade escapa; JS monta HTML com `esc()`; **CSP** sem script inline nem `eval`, só `'self'` (nada de CDN) |
+| Clickjacking, sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, HSTS em HTTPS (`SecurityHeaders`) |
+| Upload malicioso | só jpg/png/webp/heic de verdade (conteúdo, não extensão), 12 MB, 8000 px; sem SVG |
+| Custo/abuso da IA | `throttle:ai` (20/min por usuário, `AI_RATE_LIMIT`) |
+| Sessão | cookie seguro, `SameSite=lax`, regenerada no login |
+| Dependências | `composer audit` e `npm audit` zerados (rodar `composer audit-all`) |
 
-#### item_tag (pivot)
-| Column | Type | Description |
-|--------|------|-------------|
-| item_id | bigint | Foreign key to items |
-| tag_id | bigint | Foreign key to tags |
-| created_at | timestamp | |
-| updated_at | timestamp | |
+## Escala
 
-## Request Flow
+- Lista de caixas: **1 consulta** (`LocationTree`), somas em memória. Antes: 1 por caixa.
+- Lista de peças: paginada (24), relações carregadas antes (`with`).
+- Busca em linguagem natural: avalia no máximo `AI_SEARCH_MAX_ITEMS` (500) itens, em lotes
+  paralelos de 64, com cache de 10 min por pergunta+versão do inventário.
+- "Já tenho isso?": todos os itens enquanto ≤ 254 (limite de opções do modelo); depois,
+  só os que dividem palavra do nome.
+- SQLite basta para um usuário; trocar por MySQL/Postgres é só `DB_CONNECTION`
+  (a quantidade atômica usa `CASE`, portável).
 
-### Creating an Item with Photo
+## Front (resources/js)
 
-```
-1. User submits form
-       │
-       ▼
-2. StoreItemRequest validates data
-       │
-       ▼
-3. ItemController::store() receives validated data
-       │
-       ▼
-4. ItemService::create() handles business logic
-       │
-       ├──► Item::create() saves to database
-       │
-       ├──► Item::syncTags() creates/associates tags
-       │
-       └──► Spatie Media Library saves photo
-                │
-                └──► Creates thumb + preview conversions
-       │
-       ▼
-5. Redirect to item show page
+- `app.js`: Bootstrap, ícones e fontes (servidos pelo app), comportamento comum
+  (avisos, formulário de um toque só, `data-confirm`, aba "Ler tag") e um módulo por
+  página, carregado só onde é usado (`<body data-page="...">`).
+- `lib/`: `api` (fetch com CSRF), `toast`, `image` (reduz a foto no celular), `nfc`, `dom`.
+- `components/`: `PhotoPicker`, `TagInput`.
+- `pages/`: `item-create`, `item-form`, `item-show`, `item-ask`, `location-show`, `tag-form`.
+- URLs vêm das rotas por atributos `data-*`; o JS não monta caminho.
+
+## Qualidade
+
+```bash
+composer check       # Pint + Larastan nível 6 + testes
+composer audit-all   # vulnerabilidades PHP e JS
+npm run build        # front (public/build vai no deploy)
 ```
 
-### AI Image Analysis
-
-```
-1. User uploads photo via AJAX
-       │
-       ▼
-2. ItemController::analyze() validates file
-       │
-       ▼
-3. OpenAIVisionService::analyzeUploadedFile()
-       │
-       ├──► Converts image to base64
-       │
-       └──► Sends to OpenAI Vision API
-                │
-                ▼
-           GPT-4 Vision analyzes image
-                │
-                ▼
-           Returns JSON with:
-           - name
-           - description
-           - category
-           - suggested_tags
-           - specs
-           - confidence
-       │
-       ▼
-4. JSON response to client
-       │
-       ▼
-5. JavaScript populates form fields
-```
-
-## Key Patterns
-
-### Form Request Pattern
-
-Validation logic is extracted from controllers into dedicated request classes:
-
-```php
-// Before: Validation in controller
-public function store(Request $request)
-{
-    $validated = $request->validate([...]);
-    // ...
-}
-
-// After: Dedicated form request
-public function store(StoreItemRequest $request)
-{
-    $item = $this->itemService->create($request->validatedWithProcessing());
-    // ...
-}
-```
-
-### Service Layer Pattern
-
-Complex business logic is moved to service classes:
-
-```php
-// ItemService handles:
-// - Creating items with tags and photos
-// - Updating items with photo management
-// - Moving items between locations
-```
-
-### Trait Pattern
-
-Shared model behavior is extracted into traits:
-
-```php
-class Item extends Model
-{
-    use HasPhotoUrls;  // getPhotoUrl(), getMainPhotoUrlAttribute(), etc.
-}
-
-class Location extends Model
-{
-    use HasDescendants;  // getDescendantIds(), isDescendant(), canHaveParent()
-}
-```
-
-## External Dependencies
-
-### Spatie Media Library
-
-Handles file uploads with:
-- Multiple conversions (thumb, preview)
-- Disk storage abstraction
-- Relationship polymorphism
-
-### OpenAI Laravel
-
-Integration with OpenAI API for:
-- GPT-4 Vision image analysis
-- Component identification
-- Automatic metadata extraction
+Os testes simulam a IA (`Http::fake`), o disco de fotos (`Storage::fake('media')`) e
+cobrem regras de segurança (login, cabeçalhos, fotos privadas).

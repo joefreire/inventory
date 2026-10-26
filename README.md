@@ -15,7 +15,7 @@ Inventario pessoal de componentes eletronicos e pecas, com IA (Ollama Cloud) e t
 
 ## Requirements
 
-- PHP 8.4+ (o `vendor/` exige 8.4; na WSL use `php8.4`)
+- PHP 8.4+ (na WSL use `php8.4`)
 - Composer
 - Node.js 18+ (for frontend assets)
 - SQLite or MySQL/PostgreSQL
@@ -81,7 +81,7 @@ npm run build
 php artisan serve
 ```
 
-Visit `http://localhost:8000` in your browser.
+Visit `http://localhost:8000` in your browser. Crie o usuário com `php8.4 artisan inventario:usuario EMAIL`.
 
 ## Configuration
 
@@ -204,10 +204,7 @@ tests/
 
 ## Documentation
 
-- [Installation Guide](docs/INSTALLATION.md)
-- [API Reference](docs/API.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Contributing](docs/CONTRIBUTING.md)
+- [Arquitetura, segurança e escala](docs/ARCHITECTURE.md)
 
 ## License
 
@@ -225,22 +222,15 @@ This project is open-sourced software licensed under the [MIT license](LICENSE).
 | Tunel | `cloudflared-inventario.service`, tunel `inventario-canivete` (`/etc/cloudflared/inventario.yml`) |
 | DNS | `cloudflared --origincert /root/.cloudflared/cert-runningwithjoe.pem tunnel route dns ...` (o `cert.pem` padrao do canivete so cobre opiniaotech.com) |
 
+Arquitetura, segurança e escala: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Usuario (nao ha cadastro pela tela):
 ```bash
 ssh -t root@100.91.35.23 'cd /var/www/inventario && sudo -u www-data php8.4 artisan inventario:usuario EMAIL'
 ```
 
-Atualizar:
-```bash
-rsync -az --delete --exclude .git --exclude vendor --exclude node_modules --exclude .env \
-  --exclude 'database/*.sqlite' --exclude 'storage/logs/*' --exclude 'storage/app/public/*' \
-  --exclude 'storage/framework/sessions/*' --exclude 'storage/framework/views/*' \
-  --exclude 'storage/framework/cache/data/*' --exclude 'bootstrap/cache/*.php' --exclude public/storage \
-  ./ root@100.91.35.23:/var/www/inventario/
-ssh root@100.91.35.23 'cd /var/www/inventario && COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer install --no-dev -o -n \
-  && php8.4 artisan migrate --force && php8.4 artisan optimize && chown -R www-data:www-data . && chown root:www-data .env'
-```
-(`npm run build` antes, local: `public/build` vai no rsync.)
+Atualizar: `scripts/deploy.sh` (roda `composer check`, gera o front, envia e migra;
+faz cópia do banco antes).
 
 O inventario anterior (FastAPI, agosto/2026) esta em `joefreire/inventario-eletronicos` e
 ainda roda no LXC 105 do Proxmox, sem dominio. As 2 pecas e 3 caixas reais dele foram

@@ -1,16 +1,16 @@
 {{--
     Photos of a part (front, back, label); the first is the main one.
     Behaviour: resources/js/components/photo-picker.js.
-    Optional: $existentes (saved photos, when editing) with remove_media[] checkboxes.
+    Optional: $savedPhotos (saved photos, when editing) with remove_media[] checkboxes.
 --}}
 @php
-    $existentes = $existentes ?? collect();
+    $savedPhotos = $savedPhotos ?? collect();
     $max = \App\Http\Requests\StoreItemRequest::MAX_PHOTOS;
 @endphp
 
 <div class="photo-picker mb-3" id="photoPicker" data-max="{{ $max }}">
     <div class="photo-strip" data-photo-strip>
-        @foreach($existentes as $i => $media)
+        @foreach($savedPhotos as $i => $media)
             <div class="photo-tile" data-saved="{{ $media->id }}">
                 <img src="{{ $media->getUrl('thumb') }}" alt="Foto {{ $i + 1 }}">
                 <input type="checkbox" name="remove_media[]" value="{{ $media->id }}" class="d-none">
@@ -19,7 +19,7 @@
         @endforeach
     </div>
 
-    <label class="camera-zone {{ $existentes->isNotEmpty() ? 'd-none' : '' }}" data-camera-zone for="camInput">
+    <label class="camera-zone {{ $savedPhotos->isNotEmpty() ? 'd-none' : '' }}" data-camera-zone for="camInput">
         <span class="cam"><i class="bi bi-camera"></i></span>
         <strong>Tirar foto da peça</strong>
         <span class="small-muted px-4 text-center">{{ $dica ?? 'Frente, verso e etiqueta ajudam a IA. Até '.$max.' fotos.' }}</span>
@@ -27,7 +27,7 @@
 
     <div class="d-flex gap-2 mt-2">
         <label for="camInput" class="btn btn-quiet flex-fill mb-0">
-            <i class="bi bi-camera"></i> <span data-camera-label>{{ $existentes->isNotEmpty() ? 'Mais uma foto' : 'Câmera' }}</span>
+            <i class="bi bi-camera"></i> <span data-camera-label>{{ $savedPhotos->isNotEmpty() ? 'Mais uma foto' : 'Câmera' }}</span>
         </label>
         <label for="galInput" class="btn btn-quiet flex-fill mb-0">
             <i class="bi bi-images"></i> Galeria

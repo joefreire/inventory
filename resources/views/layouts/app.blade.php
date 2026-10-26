@@ -38,7 +38,7 @@
     </main>
 
     @php
-        $aba = match (true) {
+        $tab = match (true) {
             request()->routeIs('items.ask') => 'ask',
             request()->routeIs('items.create') => 'add',
             request()->routeIs('items.*') => 'items',
@@ -47,16 +47,16 @@
         };
     @endphp
     <nav class="app-tabbar" aria-label="Navegação principal">
-        <a href="{{ route('items.index') }}" class="{{ $aba === 'items' ? 'active' : '' }}">
+        <a href="{{ route('items.index') }}" class="{{ $tab === 'items' ? 'active' : '' }}">
             <i class="bi bi-cpu"></i><span>Peças</span>
         </a>
-        <a href="{{ route('locations.index') }}" class="{{ $aba === 'boxes' ? 'active' : '' }}">
+        <a href="{{ route('locations.index') }}" class="{{ $tab === 'boxes' ? 'active' : '' }}">
             <i class="bi bi-box-seam"></i><span>Caixas</span>
         </a>
         <a href="{{ route('items.create') }}" class="add" aria-label="Cadastrar peça">
             <span class="disc"><i class="bi bi-camera"></i></span><span>Cadastrar</span>
         </a>
-        <a href="{{ route('items.ask') }}" class="{{ $aba === 'ask' ? 'active' : '' }}">
+        <a href="{{ route('items.ask') }}" class="{{ $tab === 'ask' ? 'active' : '' }}">
             <i class="bi bi-chat-square-text"></i><span>Perguntar</span>
         </a>
         <button type="button" id="tabNfc" class="d-none" aria-label="Ler tag de caixa">

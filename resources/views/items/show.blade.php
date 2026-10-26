@@ -4,11 +4,11 @@
 @section('heading', 'Peça')
 @php
     // Volta para onde veio (lista filtrada, caixa, busca), menos telas de formulario.
-    $anterior = url()->previous();
-    $voltar = ($anterior !== url()->current() && str_starts_with($anterior, url('/')) && !preg_match('#/(edit|create)(\?|$)#', $anterior))
-        ? $anterior : route('items.index');
+    $previousUrl = url()->previous();
+    $backUrl = ($previousUrl !== url()->current() && str_starts_with($previousUrl, url('/')) && !preg_match('#/(edit|create)(\?|$)#', $previousUrl))
+        ? $previousUrl : route('items.index');
 @endphp
-@section('back', $voltar)
+@section('back', $backUrl)
 
 @section('top-actions')
     <button type="button" class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#acoes" aria-label="Mais ações">
@@ -24,18 +24,18 @@
      data-quantity-url="{{ route('items.quantity', $item) }}"
      data-move-url="{{ route('items.move', $item) }}"
      data-nfc-move-url="{{ route('items.nfc-move', $item) }}">
-    @php $fotos = $item->getMedia('photos'); @endphp
-    @if($fotos->isNotEmpty())
+    @php $photos = $item->getMedia('photos'); @endphp
+    @if($photos->isNotEmpty())
         <div class="gallery" id="gallery">
-            @foreach($fotos as $i => $media)
+            @foreach($photos as $i => $media)
                 <a href="{{ $media->getUrl() }}" target="_blank" rel="noopener">
                     <img src="{{ $media->getUrl('preview') }}" class="hero-photo" alt="Foto {{ $i + 1 }} de {{ $item->name }}" @if($i > 0) loading="lazy" @endif>
                 </a>
             @endforeach
         </div>
-        @if($fotos->count() > 1)
+        @if($photos->count() > 1)
             <div class="gallery-dots" id="galleryDots" aria-hidden="true">
-                @foreach($fotos as $i => $media)<span class="{{ $i === 0 ? 'on' : '' }}"></span>@endforeach
+                @foreach($photos as $i => $media)<span class="{{ $i === 0 ? 'on' : '' }}"></span>@endforeach
             </div>
         @endif
     @else

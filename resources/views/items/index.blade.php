@@ -3,14 +3,14 @@
 @section('title', 'Peças')
 
 @php
-    $filtroLocal = is_int($filter->location) ? $locationsFlat->firstWhere('id', $filter->location) : null;
-    $filtroTag = $filter->tagId ? $tags->firstWhere('id', $filter->tagId) : null;
-    $temFiltro = request()->hasAny(['location_id', 'tag_id', 'category']);
+    $activeLocation = is_int($filter->location) ? $locationsFlat->firstWhere('id', $filter->location) : null;
+    $activeTag = $filter->tagId ? $tags->firstWhere('id', $filter->tagId) : null;
+    $hasFilter = request()->hasAny(['location_id', 'tag_id', 'category']);
 @endphp
 
 @section('top-actions')
     <button type="button" class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#filtros" aria-label="Filtrar">
-        <i class="bi {{ $temFiltro ? 'bi-funnel-fill' : 'bi-funnel' }}"></i>
+        <i class="bi {{ $hasFilter ? 'bi-funnel-fill' : 'bi-funnel' }}"></i>
     </button>
 @endsection
 
@@ -41,11 +41,11 @@
         </div>
     @endif
 
-    @if($filtroTag || request('category'))
+    @if($activeTag || request('category'))
         <div class="d-flex flex-wrap gap-2 mb-2">
-            @if($filtroTag)
+            @if($activeTag)
                 <a href="{{ route('items.index', request()->except('tag_id', 'page')) }}" class="chip active">
-                    {{ $filtroTag->name }} <i class="bi bi-x-lg"></i>
+                    {{ $activeTag->name }} <i class="bi bi-x-lg"></i>
                 </a>
             @endif
             @if(request('category'))
@@ -59,7 +59,7 @@
     <p class="small-muted mx-1 mb-2">
         {{ $items->total() }} {{ $items->total() === 1 ? 'peça' : 'peças' }}
         @if(request('search')) para "{{ request('search') }}" @endif
-        @if($filtroLocal) em {{ $filtroLocal->name }} @endif
+        @if($activeLocation) em {{ $activeLocation->name }} @endif
     </p>
 
     @if($items->count() > 0)
@@ -134,7 +134,7 @@
             </div>
         @endif
 
-        @if($temFiltro || request('search'))
+        @if($hasFilter || request('search'))
             <a href="{{ route('items.index') }}" class="btn btn-quiet w-100 mt-4">Limpar filtros</a>
         @endif
     </div>

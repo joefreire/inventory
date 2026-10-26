@@ -11,7 +11,7 @@
         @csrf
         @method('PUT')
 
-        @include('items._photos', ['existentes' => $item->getMedia('photos'), 'dica' => 'Adicione frente, verso ou etiqueta.'])
+        @include('items._photos', ['savedPhotos' => $item->getMedia('photos'), 'dica' => 'Adicione frente, verso ou etiqueta.'])
 
         @include('items._fields', ['item' => $item])
     </form>
