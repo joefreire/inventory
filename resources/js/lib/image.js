@@ -23,3 +23,8 @@ export function shrinkImage(file, maxSide = 1600) {
         img.src = url;
     });
 }
+
+/** HEIC/HEIF (iPhone format): neither PHP nor most browsers outside Safari read it. */
+export function isHeic(file) {
+    return /^image\/hei[cf]/.test(file?.type ?? '') || /\.hei[cf]$/i.test(file?.name ?? '');
+}

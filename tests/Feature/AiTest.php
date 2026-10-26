@@ -56,7 +56,7 @@ class AiTest extends TestCase
         ]);
 
         $response = $this->postJson(route('items.analyze'), [
-            'photo' => UploadedFile::fake()->image('peca.jpg'),
+            'photos' => [UploadedFile::fake()->image('peca.jpg')],
         ]);
 
         $response->assertOk()
@@ -98,7 +98,7 @@ class AiTest extends TestCase
             ]]),
         ]);
 
-        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('rele.jpg')])
+        $this->postJson(route('items.analyze'), ['photos' => [UploadedFile::fake()->image('rele.jpg')]])
             ->assertOk()
             ->assertJsonPath('data.name', 'Rele 5V')
             ->assertJsonPath('data.models.vision', 'visao-b')
@@ -160,7 +160,7 @@ class AiTest extends TestCase
     {
         Http::fake(['ollama.test/api/chat' => Http::response('erro', 500)]);
 
-        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('x.jpg')])
+        $this->postJson(route('items.analyze'), ['photos' => [UploadedFile::fake()->image('x.jpg')]])
             ->assertStatus(502)
             ->assertJsonPath('success', false);
     }
@@ -225,7 +225,7 @@ class AiTest extends TestCase
             },
         ]);
 
-        $r = $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('xt60.jpg')])->assertOk();
+        $r = $this->postJson(route('items.analyze'), ['photos' => [UploadedFile::fake()->image('xt60.jpg')]])->assertOk();
 
         $r->assertJsonPath('data.quantity', 20)
             ->assertJsonPath('data.kit', false)
@@ -240,7 +240,7 @@ class AiTest extends TestCase
             'ollama.test/v1/systemone' => Http::response(['answers' => []]),
         ]);
 
-        $this->postJson(route('items.analyze'), ['photo' => UploadedFile::fake()->image('k.jpg')])
+        $this->postJson(route('items.analyze'), ['photos' => [UploadedFile::fake()->image('k.jpg')]])
             ->assertOk()
             ->assertJsonPath('data.quantity', null)
             ->assertJsonPath('data.kit', true);
@@ -271,5 +271,44 @@ class AiTest extends TestCase
 
         $this->postJson(route('items.analyze'), ['photos' => $fotos])->assertStatus(422);
         Http::assertNothingSent();
+    }
+
+    public function test_empty_vision_answer_falls_back_to_next_model(): void
+    {
+        Http::fake([
+            'ollama.test/api/chat' => function (Request $request) {
+                return $request['model'] === 'visao-a'
+                    ? Http::response($this->chatResponse(['name' => '', 'description' => '']))
+                    : Http::response($this->chatResponse(['name' => 'Servo MG996R']));
+            },
+            'ollama.test/v1/systemone' => Http::response(['answers' => []]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['photos' => [UploadedFile::fake()->image('servo.jpg')]])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Servo MG996R')
+            ->assertJsonPath('data.models.vision', 'visao-b');
+    }
+
+    public function test_decision_without_answers_is_an_error_not_an_empty_suggestion(): void
+    {
+        Http::fake(['ollama.test/v1/systemone' => Http::response(['error' => 'model overloaded'])]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Resistor 10k'])
+            ->assertStatus(502)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_search_failure_is_not_cached_as_nothing_found(): void
+    {
+        Item::create(['name' => 'Sensor DS18B20']);
+        Http::fakeSequence('ollama.test/*')
+            ->push(['error' => 'model overloaded'])
+            ->push(['answers' => []]);
+
+        $this->get(route('items.ask', ['q' => 'medir temperatura']))->assertOk();
+        $this->get(route('items.ask', ['q' => 'medir temperatura']))->assertOk();
+
+        Http::assertSentCount(2); // the failure was not remembered
     }
 }

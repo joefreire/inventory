@@ -58,6 +58,12 @@ final class OllamaVisionModel implements VisionModel
 
                 continue;
             }
+            // {} or {"name": ""}: the model saw nothing; the next one may
+            if (! self::identifiesSomething($data)) {
+                $errors[] = "{$model}: não identificou nada";
+
+                continue;
+            }
 
             return ['model' => $model, 'data' => $data];
         }
@@ -65,6 +71,20 @@ final class OllamaVisionModel implements VisionModel
         Log::warning('Ollama vision: every model failed', ['errors' => $errors]);
 
         throw new AiException('Nenhum modelo de visão respondeu: '.implode(' | ', $errors));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private static function identifiesSomething(array $data): bool
+    {
+        foreach (['name', 'description'] as $key) {
+            if (is_string($data[$key] ?? null) && trim($data[$key]) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

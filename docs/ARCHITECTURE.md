@@ -57,7 +57,7 @@ sem custo de ida e volta extra, e aparece na resposta da análise com a chave `k
 | Fotos vazando | disco privado `media`; URLs passam por `MediaController` (com login). Antes: `/storage/{id}` público |
 | XSS | Blade escapa; JS monta HTML com `esc()`; **CSP** sem script inline nem `eval`, só `'self'` (nada de CDN) |
 | Clickjacking, sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, HSTS em HTTPS (`SecurityHeaders`) |
-| Upload malicioso | só jpg/png/webp/heic de verdade (conteúdo, não extensão), 12 MB, 8000 px; sem SVG |
+| Upload malicioso | só jpg/png/webp de verdade (HEIC recusado já no navegador) (conteúdo, não extensão), 12 MB, 8000 px; sem SVG |
 | Custo/abuso da IA | `throttle:ai` (20/min por usuário, `AI_RATE_LIMIT`) |
 | Sessão | cookie seguro, `SameSite=lax`, regenerada no login |
 | Dependências | `composer audit` e `npm audit` zerados (rodar `composer audit-all`) |
@@ -68,7 +68,7 @@ sem custo de ida e volta extra, e aparece na resposta da análise com a chave `k
 - Lista de peças: paginada (24), relações carregadas antes (`with`).
 - Busca em linguagem natural: avalia no máximo `AI_SEARCH_MAX_ITEMS` (500) itens, em lotes
   paralelos de 64, com cache de 10 min por pergunta+versão do inventário.
-- "Já tenho isso?": todos os itens enquanto ≤ 254 (limite de opções do modelo); depois,
+- "Já tenho isso?": todos os itens enquanto ≤ 200 (`DuplicateCandidates::MAX`) (limite de opções do modelo); depois,
   só os que dividem palavra do nome.
 - SQLite basta para um usuário; trocar por MySQL/Postgres é só `DB_CONNECTION`
   (a quantidade atômica usa `CASE`, portável).

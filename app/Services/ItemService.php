@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Item;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Writes on parts: create/update with tags and photos, move, quantity.
@@ -35,18 +36,22 @@ class ItemService
      */
     public function update(Item $item, array $data, ?array $tagNames = null, array $newPhotos = [], array $removeMediaIds = []): Item
     {
-        return DB::transaction(function () use ($item, $data, $tagNames, $newPhotos, $removeMediaIds) {
+        DB::transaction(function () use ($item, $data, $tagNames, $newPhotos) {
             $item->update($data);
             if ($tagNames !== null) {
                 $item->syncTags($tagNames);
             }
-            if ($removeMediaIds !== []) {
-                $item->getMedia('photos')->whereIn('id', $removeMediaIds)->each->delete();
-            }
             $this->addPhotos($item, $newPhotos);
-
-            return $item;
         });
+
+        // Deleting a media erases its files at once, and a rollback does not bring
+        // them back: photos only go after everything else was saved.
+        if ($removeMediaIds !== []) {
+            $item->getMedia('photos')->whereIn('id', $removeMediaIds)->each->delete();
+            $item->unsetRelation('media');
+        }
+
+        return $item;
     }
 
     public function delete(Item $item): bool
@@ -80,8 +85,17 @@ class ItemService
      */
     private function addPhotos(Item $item, array $photos): void
     {
-        foreach ($photos as $photo) {
-            $item->addMedia($photo)->toMediaCollection('photos');
+        $added = [];
+        try {
+            foreach ($photos as $photo) {
+                $added[] = $item->addMedia($photo)->toMediaCollection('photos');
+            }
+        } catch (Throwable $e) {
+            // the rollback undoes the rows, not the files already written to disk
+            foreach ($added as $media) {
+                $media->delete();
+            }
+            throw $e;
         }
     }
 }

@@ -62,7 +62,12 @@ final class OllamaDecisionModel implements DecisionModel
             if ($response->failed()) {
                 throw new AiException("Modelo de decisão: HTTP {$response->status()} ".mb_substr($response->body(), 0, 200));
             }
-            $answers += (array) $response->json('answers', []);
+            // HTTP 200 without answers (e.g. {"error": ...}) is a failure, not "nothing matches"
+            $batchAnswers = $response->json('answers');
+            if (! is_array($batchAnswers)) {
+                throw new AiException('Modelo de decisão sem "answers": '.mb_substr($response->body(), 0, 200));
+            }
+            $answers += $batchAnswers;
         }
 
         return $answers;

@@ -8,6 +8,8 @@ use App\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\TestCase;
 
 class ItemControllerTest extends TestCase
@@ -173,7 +175,7 @@ class ItemControllerTest extends TestCase
 
         $response = $this->post(route('items.store'), [
             'name' => 'Item com foto',
-            'photo' => UploadedFile::fake()->image('photo.jpg', 800, 600),
+            'photos' => [UploadedFile::fake()->image('photo.jpg', 800, 600)],
         ]);
 
         $response->assertRedirect();
@@ -290,5 +292,58 @@ class ItemControllerTest extends TestCase
         $fotos = array_map(fn ($i) => UploadedFile::fake()->image("f{$i}.jpg"), range(1, 7));
 
         $this->post(route('items.store'), ['name' => 'Muitas', 'photos' => $fotos])->assertSessionHasErrors('photos');
+    }
+
+    /** A photo that fails to save (disk full, broken conversion...). */
+    private function failPhotoNamed(string $fileName): void
+    {
+        Media::creating(function (Media $media) use ($fileName) {
+            if ($media->file_name === $fileName) {
+                throw new RuntimeException('falha simulada ao salvar foto');
+            }
+        });
+    }
+
+    public function test_failed_photo_on_store_leaves_no_files_behind(): void
+    {
+        Storage::fake('media');
+        $this->failPhotoNamed('ruim.jpg');
+
+        $this->post(route('items.store'), [
+            'name' => 'Rele 5V',
+            'photos' => [UploadedFile::fake()->image('boa.jpg'), UploadedFile::fake()->image('ruim.jpg')],
+        ])->assertStatus(500);
+
+        $this->assertDatabaseMissing('items', ['name' => 'Rele 5V']);
+        $this->assertSame([], Storage::disk('media')->allFiles());
+    }
+
+    public function test_failed_new_photo_on_update_keeps_the_photo_marked_for_removal(): void
+    {
+        Storage::fake('media');
+        $item = Item::create(['name' => 'Rele 5V']);
+        $old = $item->addMedia(UploadedFile::fake()->image('antiga.jpg'))->toMediaCollection('photos');
+        $this->failPhotoNamed('ruim.jpg');
+
+        $this->put(route('items.update', $item), [
+            'name' => 'Rele 5V',
+            'remove_media' => [$old->id],
+            'photos' => [UploadedFile::fake()->image('ruim.jpg')],
+        ])->assertStatus(500);
+
+        $this->assertSame(['antiga.jpg'], $item->fresh()->getMedia('photos')->pluck('file_name')->all());
+        $this->assertFileExists($old->getPath());
+    }
+
+    public function test_heic_photo_is_refused_with_a_validation_error(): void
+    {
+        Storage::fake('media');
+
+        $this->post(route('items.store'), [
+            'name' => 'Foto do iPhone',
+            'photos' => [UploadedFile::fake()->create('IMG_0001.heic', 200, 'image/heic')],
+        ])->assertSessionHasErrors('photos.0');
+
+        $this->assertDatabaseMissing('items', ['name' => 'Foto do iPhone']);
     }
 }

@@ -93,6 +93,9 @@
             <i class="bi bi-broadcast"></i> Encostar na caixa
         </button>
     </div>
+    <p class="small-muted mx-1 mt-2 mb-0 d-none" id="nfcMoveHint">
+        Sem NFC no navegador (iPhone): encoste o celular na tag da caixa e use "Guardar item aqui".
+    </p>
 
     @if($item->description)
         <h3 class="group-title">O que é</h3>
@@ -112,7 +115,7 @@
 
     @if($item->notes)
         <h3 class="group-title">Notas</h3>
-        <p class="mx-1" style="white-space: pré-line; max-width: 62ch">{{ $item->notes }}</p>
+        <p class="mx-1" style="white-space: pre-line; max-width: 62ch">{{ $item->notes }}</p>
     @endif
 
     <p class="small-muted mx-1 mt-4">

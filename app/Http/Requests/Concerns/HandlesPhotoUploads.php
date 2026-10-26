@@ -11,6 +11,8 @@ use Illuminate\Validation\Rules\File;
  *
  * Only real raster images (content is checked, not the extension), bounded size
  * and dimensions: no SVG (script inside an image) and no 100-megapixel bombs.
+ * No HEIC: PHP cannot read it (getimagesize, GD). The iPhone sends JPEG to the
+ * browser on its own; the front refuses a HEIC it could not convert.
  */
 trait HandlesPhotoUploads
 {
@@ -25,28 +27,24 @@ trait HandlesPhotoUploads
     protected function photoRules(int $maxPhotos): array
     {
         $image = File::image()
-            ->types(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'])
+            ->types(['jpg', 'jpeg', 'png', 'webp'])
             ->max(self::$maxPhotoKb)
             ->dimensions(Rule::dimensions()->maxWidth(self::$maxPhotoSide)->maxHeight(self::$maxPhotoSide));
 
         return [
-            'photo' => ['nullable', $image],
             'photos' => ['nullable', 'array', 'max:'.$maxPhotos],
             'photos.*' => [$image],
         ];
     }
 
     /**
-     * Uploaded photos in order: `photos[]` and, for older clients, `photo` first.
+     * Uploaded photos (`photos[]`) in order.
      *
      * @return list<UploadedFile>
      */
     public function photoFiles(int $max): array
     {
         $files = array_values(array_filter((array) $this->file('photos', []), fn ($f) => $f instanceof UploadedFile));
-        if ($this->file('photo') instanceof UploadedFile) {
-            array_unshift($files, $this->file('photo'));
-        }
 
         return array_slice($files, 0, $max);
     }

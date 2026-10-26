@@ -1,4 +1,4 @@
-import { shrinkImage } from '../lib/image';
+import { isHeic, shrinkImage } from '../lib/image';
 import { toast } from '../lib/toast';
 
 /**
@@ -41,7 +41,15 @@ export class PhotoPicker {
         const free = this.max - this.keptSaved().length - this.files.length;
         const accepted = [...fileList].slice(0, Math.max(0, free));
         if (fileList.length > accepted.length) toast(`No máximo ${this.max} fotos por peça.`, 'error');
-        for (const file of accepted) this.files.push(await shrinkImage(file, 1600));
+        for (const file of accepted) {
+            const photo = await shrinkImage(file, 1600);
+            // the browser could not convert it to JPEG and the server cannot read HEIC
+            if (isHeic(photo)) {
+                toast('Foto HEIC não abre aqui. Tire pela câmera do app ou salve como JPG.', 'error');
+                continue;
+            }
+            this.files.push(photo);
+        }
         this.render();
         if (accepted.length) this.emit();
     }
