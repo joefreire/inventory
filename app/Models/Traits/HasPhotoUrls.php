@@ -9,8 +9,6 @@ namespace App\Models\Traits;
  * (thumb, preview, original) from the media library.
  *
  * @property-read string|null $main_photo_url Thumbnail URL (200x200)
- * @property-read string|null $preview_photo_url Preview URL (800x800)
- * @property-read string|null $original_photo_url Original photo URL
  */
 trait HasPhotoUrls
 {
@@ -38,21 +36,5 @@ trait HasPhotoUrls
     public function getMainPhotoUrlAttribute(): ?string
     {
         return $this->getPhotoUrl('thumb');
-    }
-
-    /**
-     * Get the preview photo URL (800x800).
-     */
-    public function getPreviewPhotoUrlAttribute(): ?string
-    {
-        return $this->getPhotoUrl('preview');
-    }
-
-    /**
-     * Get the original photo URL.
-     */
-    public function getOriginalPhotoUrlAttribute(): ?string
-    {
-        return $this->getPhotoUrl();
     }
 }

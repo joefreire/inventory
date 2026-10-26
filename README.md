@@ -166,10 +166,8 @@ php artisan storage:link
 | POST | `/items/{id}/move` | Move item to location |
 | GET | `/locations` | List all locations |
 | POST | `/locations` | Create new location |
-| GET | `/locations/tree` | Get location tree (JSON) |
 | GET | `/tags` | List all tags |
 | POST | `/tags` | Create new tag |
-| GET | `/tags/search` | Search tags (JSON) |
 
 As rotas JSON são internas da interface (sem API pública).
 

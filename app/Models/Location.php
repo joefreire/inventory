@@ -107,16 +107,6 @@ class Location extends Model
     }
 
     /**
-     * Get all children recursively (eager loading helper).
-     *
-     * @return HasMany<Location, $this>
-     */
-    public function allChildren(): HasMany
-    {
-        return $this->children()->with('allChildren');
-    }
-
-    /**
      * Get all ancestor locations from root to parent.
      *
      * @return array<Location>

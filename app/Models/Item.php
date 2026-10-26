@@ -35,8 +35,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read Collection<int, Tag> $tags
  * @property-read MediaCollection<int, Media> $media
  * @property-read string|null $main_photo_url
- * @property-read string|null $preview_photo_url
- * @property-read string|null $original_photo_url
  *
  * @method static Builder|Item search(?string $search)
  * @method static Builder|Item inLocation(?int $locationId)

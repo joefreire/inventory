@@ -82,7 +82,7 @@ class ItemController extends Controller
             $request->itemData(),
             $request->tagNames(),
             $request->photoFiles(StoreItemRequest::MAX_PHOTOS),
-            $request->mediaToRemove($item),
+            $request->mediaToRemove(),
         );
 
         return redirect()->route('items.show', $item)->with('success', 'Alterações salvas.');

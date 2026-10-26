@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Item;
-
 /**
  * Editing a part: same fields as creating, quantity may reach 0 (part ran out)
  * and chosen photos can be removed.
@@ -18,23 +16,18 @@ class UpdateItemRequest extends StoreItemRequest
     public function rules(): array
     {
         return array_merge(parent::rules(), [
-            'remove_photo' => ['nullable', 'boolean'],
             'remove_media' => ['nullable', 'array'],
             'remove_media.*' => ['integer'],
         ]);
     }
 
     /**
-     * Ids of this item's photos to remove (`remove_photo` = all, older clients).
+     * Ids of the photos to remove (ItemService only removes this item's own).
      *
      * @return list<int>
      */
-    public function mediaToRemove(Item $item): array
+    public function mediaToRemove(): array
     {
-        if ($this->boolean('remove_photo')) {
-            return $item->getMedia('photos')->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-        }
-
         return array_values(array_map('intval', (array) $this->validated('remove_media', [])));
     }
 }

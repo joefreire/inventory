@@ -5,9 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreTagRequest;
 use App\Http\Requests\UpdateTagRequest;
 use App\Models\Tag;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -40,19 +38,10 @@ class TagController extends Controller
 
     /**
      * Store a newly created tag.
-     *
-     * Returns JSON response for AJAX requests, redirect otherwise.
      */
-    public function store(StoreTagRequest $request): JsonResponse|RedirectResponse
+    public function store(StoreTagRequest $request): RedirectResponse
     {
         $tag = Tag::create($request->validated());
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'tag' => $tag,
-            ]);
-        }
 
         return redirect()
             ->route('tags.index')
@@ -103,20 +92,5 @@ class TagController extends Controller
         return redirect()
             ->route('tags.index')
             ->with('success', "Tag {$name} excluída.");
-    }
-
-    /**
-     * Search tags by name for autocomplete functionality.
-     */
-    public function search(Request $request): JsonResponse
-    {
-        $query = $request->get('q', '');
-
-        $tags = Tag::where('name', 'like', "%{$query}%")
-            ->orderBy('name')
-            ->limit(10)
-            ->get(['id', 'name', 'color']);
-
-        return response()->json($tags);
     }
 }

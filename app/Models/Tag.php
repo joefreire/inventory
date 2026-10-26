@@ -19,7 +19,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Item> $items
- * @property-read int $item_count
  */
 class Tag extends Model
 {
@@ -55,14 +54,6 @@ class Tag extends Model
     public function items(): BelongsToMany
     {
         return $this->belongsToMany(Item::class)->withTimestamps();
-    }
-
-    /**
-     * Get the count of items with this tag.
-     */
-    public function getItemCountAttribute(): int
-    {
-        return $this->items()->count();
     }
 
     /**

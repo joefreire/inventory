@@ -7,8 +7,6 @@ use App\Http\Requests\UpdateLocationRequest;
 use App\Locations\LocationTree;
 use App\Models\Item;
 use App\Models\Location;
-use App\Services\LocationService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +23,6 @@ class LocationController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        private readonly LocationService $locationService,
         private readonly LocationTree $tree,
     ) {}
 
@@ -118,13 +115,5 @@ class LocationController extends Controller
         return redirect()
             ->route('locations.index')
             ->with('success', "Caixa {$name} excluída.");
-    }
-
-    /**
-     * Get the location tree as JSON for API/AJAX requests.
-     */
-    public function tree(): JsonResponse
-    {
-        return response()->json($this->locationService->getFullTree());
     }
 }

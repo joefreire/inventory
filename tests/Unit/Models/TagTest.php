@@ -77,14 +77,4 @@ class TagTest extends TestCase
 
         $this->assertMatchesRegularExpression('/^#[0-9A-Fa-f]{6}$/', $color);
     }
-
-    public function test_item_count_attribute(): void
-    {
-        $tag = Tag::create(['name' => 'eletronica']);
-
-        Item::create(['name' => 'Item 1'])->tags()->attach($tag);
-        Item::create(['name' => 'Item 2'])->tags()->attach($tag);
-
-        $this->assertEquals(2, $tag->item_count);
-    }
 }

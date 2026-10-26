@@ -71,23 +71,6 @@ class TagControllerTest extends TestCase
         $response->assertSessionHasErrors('color');
     }
 
-    public function test_store_returns_json_when_expected(): void
-    {
-        $response = $this->postJson(route('tags.store'), [
-            'name' => 'api-tag',
-            'color' => '#00ff00',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'tag' => [
-                'name' => 'api-tag',
-                'color' => '#00ff00',
-            ],
-        ]);
-    }
-
     public function test_show_page_displays_tag(): void
     {
         $tag = Tag::create(['name' => 'eletronica']);
@@ -158,17 +141,5 @@ class TagControllerTest extends TestCase
 
         $response->assertRedirect(route('tags.index'));
         $this->assertDatabaseMissing('tags', ['id' => $tag->id]);
-    }
-
-    public function test_search_api_returns_tags(): void
-    {
-        Tag::create(['name' => 'eletronica']);
-        Tag::create(['name' => 'eletro']);
-        Tag::create(['name' => 'mecanica']);
-
-        $response = $this->get(route('tags.search', ['q' => 'eletr']));
-
-        $response->assertStatus(200);
-        $response->assertJsonCount(2);
     }
 }

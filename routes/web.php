@@ -24,10 +24,8 @@ Route::middleware('auth')->group(function () {
     Route::post('items/{item}/nfc-move', [NfcController::class, 'moveItem'])->name('items.nfc-move');
 
     Route::resource('locations', LocationController::class);
-    Route::get('api/locations/tree', [LocationController::class, 'tree'])->name('locations.tree');
 
     Route::resource('tags', TagController::class);
-    Route::get('api/tags/search', [TagController::class, 'search'])->name('tags.search');
 
     // part photos from the private disk
     Route::get('media/{media}/{conversion}', [MediaController::class, 'show'])

@@ -159,16 +159,4 @@ class LocationControllerTest extends TestCase
         $response->assertRedirect(route('locations.index'));
         $this->assertDatabaseMissing('locations', ['id' => $location->id]);
     }
-
-    public function test_tree_api_returns_json(): void
-    {
-        Location::create(['name' => 'Escritorio']);
-
-        $response = $this->get(route('locations.tree'));
-
-        $response->assertStatus(200);
-        $response->assertJsonStructure([
-            '*' => ['id', 'name', 'path', 'depth', 'item_count', 'children'],
-        ]);
-    }
 }
