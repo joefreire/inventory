@@ -42,7 +42,7 @@ class NfcController extends Controller
         $code = self::codeFromTag($validated['tag']);
         $location = $code ? Location::where('nfc_code', $code)->first() : null;
 
-        if (!$location) {
+        if (! $location) {
             return response()->json([
                 'success' => false,
                 'message' => 'Essa tag não e de nenhuma caixa do inventário.',

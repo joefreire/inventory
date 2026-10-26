@@ -14,8 +14,6 @@ class StoreTagRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
@@ -39,12 +37,10 @@ class StoreTagRequest extends FormRequest
      * Prepare the data for validation.
      *
      * Generates a random color if not provided.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
-        if (!$this->has('color') || empty($this->color)) {
+        if (! $this->has('color') || empty($this->color)) {
             $this->merge(['color' => Tag::generateColor()]);
         }
     }

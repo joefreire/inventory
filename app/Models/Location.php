@@ -22,7 +22,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $nfc_code
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
  * @property-read Location|null $parent
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Location> $children
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Item> $items
@@ -53,8 +52,6 @@ class Location extends Model
      *
      * Automatically updates path and depth on save,
      * and propagates changes to children.
-     *
-     * @return void
      */
     protected static function booted(): void
     {
@@ -136,13 +133,11 @@ class Location extends Model
 
     /**
      * Update the path and depth based on parent.
-     *
-     * @return void
      */
     public function updatePath(): void
     {
         if ($this->parent) {
-            $this->path = $this->parent->path . '/' . $this->name;
+            $this->path = $this->parent->path.'/'.$this->name;
             $this->depth = $this->parent->depth + 1;
         } else {
             $this->path = $this->name;
@@ -152,8 +147,6 @@ class Location extends Model
 
     /**
      * Get the full path attribute.
-     *
-     * @return string
      */
     public function getFullPathAttribute(): string
     {
@@ -162,8 +155,6 @@ class Location extends Model
 
     /**
      * Get the count of items directly in this location.
-     *
-     * @return int
      */
     public function getItemCountAttribute(): int
     {
@@ -172,8 +163,6 @@ class Location extends Model
 
     /**
      * Get the total count of items including all descendants.
-     *
-     * @return int
      */
     public function getTotalItemCountAttribute(): int
     {
@@ -188,8 +177,6 @@ class Location extends Model
 
     /**
      * Codigo curto e unico para a tag NFC (sem letras que confundem: 0/o, 1/l).
-     *
-     * @return string
      */
     public static function newNfcCode(): string
     {
@@ -203,15 +190,13 @@ class Location extends Model
     /**
      * Link gravado na tag NFC: NFC_BASE_URL/n/{codigo}. Sem NFC_BASE_URL, usa
      * o endereco atual (so para teste: a tag gravada nao muda depois).
-     *
-     * @return string
      */
     public function getNfcUrlAttribute(): string
     {
         $base = config('app.nfc_base_url');
 
         return $base
-            ? rtrim($base, '/') . '/n/' . $this->nfc_code
+            ? rtrim($base, '/').'/n/'.$this->nfc_code
             : route('nfc.open', $this->nfc_code);
     }
 }

@@ -28,7 +28,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property array|null $ai_metadata
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
  * @property-read Location|null $location
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Tag> $tags
  * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
@@ -43,8 +42,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  */
 class Item extends Model implements HasMedia
 {
-    use InteractsWithMedia;
     use HasPhotoUrls;
+    use InteractsWithMedia;
 
     /**
      * The attributes that are mass assignable.
@@ -94,8 +93,6 @@ class Item extends Model implements HasMedia
 
     /**
      * Register the media collections for this model.
-     *
-     * @return void
      */
     public function registerMediaCollections(): void
     {
@@ -107,9 +104,6 @@ class Item extends Model implements HasMedia
      * Register the media conversions for this model.
      *
      * Creates thumbnail (200x200) and preview (800x800) versions.
-     *
-     * @param Media|null $media
-     * @return void
      */
     public function registerMediaConversions(?Media $media = null): void
     {
@@ -129,8 +123,7 @@ class Item extends Model implements HasMedia
     /**
      * Synchronize tags by name, creating new tags as needed.
      *
-     * @param array<string> $tagNames Array of tag names
-     * @return void
+     * @param  array<string>  $tagNames  Array of tag names
      */
     public function syncTags(array $tagNames): void
     {
@@ -138,7 +131,7 @@ class Item extends Model implements HasMedia
 
         foreach ($tagNames as $name) {
             $name = trim($name);
-            if (!empty($name)) {
+            if (! empty($name)) {
                 $tag = Tag::getOrCreate($name);
                 $tagIds[] = $tag->id;
             }
@@ -150,8 +143,7 @@ class Item extends Model implements HasMedia
     /**
      * Scope to search items by text in multiple fields.
      *
-     * @param Builder<Item> $query
-     * @param string|null $search
+     * @param  Builder<Item>  $query
      * @return Builder<Item>
      */
     public function scopeSearch(Builder $query, ?string $search): Builder
@@ -160,27 +152,26 @@ class Item extends Model implements HasMedia
             return $query;
         }
 
-        $search = '%' . $search . '%';
+        $search = '%'.$search.'%';
 
         return $query->where(function (Builder $q) use ($search) {
             $q->where('name', 'like', $search)
-              ->orWhere('description', 'like', $search)
-              ->orWhere('ai_description', 'like', $search)
-              ->orWhere('category', 'like', $search)
-              ->orWhere('notes', 'like', $search);
+                ->orWhere('description', 'like', $search)
+                ->orWhere('ai_description', 'like', $search)
+                ->orWhere('category', 'like', $search)
+                ->orWhere('notes', 'like', $search);
         });
     }
 
     /**
      * Scope to filter items by location.
      *
-     * @param Builder<Item> $query
-     * @param int|null $locationId
+     * @param  Builder<Item>  $query
      * @return Builder<Item>
      */
     public function scopeInLocation(Builder $query, ?int $locationId): Builder
     {
-        if (!$locationId) {
+        if (! $locationId) {
             return $query;
         }
 
@@ -190,13 +181,12 @@ class Item extends Model implements HasMedia
     /**
      * Scope to filter items that have a specific tag.
      *
-     * @param Builder<Item> $query
-     * @param int|null $tagId
+     * @param  Builder<Item>  $query
      * @return Builder<Item>
      */
     public function scopeWithTag(Builder $query, ?int $tagId): Builder
     {
-        if (!$tagId) {
+        if (! $tagId) {
             return $query;
         }
 
@@ -208,8 +198,7 @@ class Item extends Model implements HasMedia
     /**
      * Scope to filter items by category.
      *
-     * @param Builder<Item> $query
-     * @param string|null $category
+     * @param  Builder<Item>  $query
      * @return Builder<Item>
      */
     public function scopeInCategory(Builder $query, ?string $category): Builder
@@ -240,7 +229,7 @@ class Item extends Model implements HasMedia
                 $lista[str_replace('_', ' ', ucfirst((string) $chave))] = trim((string) $valor);
             }
         }
-        if (!empty($meta['visible_text']) && is_string($meta['visible_text'])) {
+        if (! empty($meta['visible_text']) && is_string($meta['visible_text'])) {
             $lista['Texto na peca'] = $meta['visible_text'];
         }
 

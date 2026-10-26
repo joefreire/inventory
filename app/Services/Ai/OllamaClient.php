@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Log;
 class OllamaClient
 {
     /**
-     * @param array<int, string> $models Modelos em ordem de preferencia
-     * @param array<int, string> $images Imagens em base64 (sem prefixo data:)
+     * @param  array<int, string>  $models  Modelos em ordem de preferencia
+     * @param  array<int, string>  $images  Imagens em base64 (sem prefixo data:)
      * @return array{model: string, data: array<string, mixed>}
      */
     public function chatJson(array $models, string $system, string $prompt, array $images = []): array
@@ -48,17 +48,20 @@ class OllamaClient
                 ]);
             } catch (ConnectionException $e) {
                 $erros[] = "{$model}: {$e->getMessage()}";
+
                 continue;
             }
 
             if ($response->failed()) {
-                $erros[] = "{$model}: HTTP {$response->status()} " . mb_substr($response->body(), 0, 200);
+                $erros[] = "{$model}: HTTP {$response->status()} ".mb_substr($response->body(), 0, 200);
+
                 continue;
             }
 
             $data = $this->parseJson((string) $response->json('message.content'));
             if ($data === null) {
                 $erros[] = "{$model}: resposta sem JSON valido";
+
                 continue;
             }
 
@@ -67,15 +70,15 @@ class OllamaClient
 
         Log::warning('Ollama chat: todos os modelos falharam', ['erros' => $erros]);
 
-        throw new AiException('Nenhum modelo de visao respondeu: ' . implode(' | ', $erros));
+        throw new AiException('Nenhum modelo de visao respondeu: '.implode(' | ', $erros));
     }
 
     /**
      * Pergunta ao modelo de decisao.
      *
-     * @param string|array<mixed> $state Texto ou objeto que o modelo julga
-     * @param array<string, array<string, mixed>> $questions id => {type, instructions, criteria}
-     * @param array<int, string> $images Imagens em base64, compartilhadas por todas as perguntas
+     * @param  string|array<mixed>  $state  Texto ou objeto que o modelo julga
+     * @param  array<string, array<string, mixed>>  $questions  id => {type, instructions, criteria}
+     * @param  array<int, string>  $images  Imagens em base64, compartilhadas por todas as perguntas
      * @return array<string, array<string, mixed>> id => resposta (choice/noul/score)
      */
     public function decide(string|array $state, array $questions, array $images = []): array
@@ -102,12 +105,12 @@ class OllamaClient
         foreach ($lotes as $i => $lote) {
             $response = $responses[(string) $i];
 
-            if (!$response instanceof Response) {
-                throw new AiException('Modelo de decisao sem resposta: ' . $response->getMessage());
+            if (! $response instanceof Response) {
+                throw new AiException('Modelo de decisao sem resposta: '.$response->getMessage());
             }
             if ($response->failed()) {
                 throw new AiException(
-                    "Modelo de decisao: HTTP {$response->status()} " . mb_substr($response->body(), 0, 200)
+                    "Modelo de decisao: HTTP {$response->status()} ".mb_substr($response->body(), 0, 200)
                 );
             }
 
@@ -125,7 +128,7 @@ class OllamaClient
     private function configure(PendingRequest $request): PendingRequest
     {
         $key = config('ai.ollama.api_key');
-        if (!$key) {
+        if (! $key) {
             throw new AiException('OLLAMA_API_KEY nao configurada no .env');
         }
 

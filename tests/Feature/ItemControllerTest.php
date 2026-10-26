@@ -234,7 +234,7 @@ class ItemControllerTest extends TestCase
             ->assertRedirect(route('items.create', ['location_id' => $caixa->id]));
 
         $this->get(route('items.create', ['location_id' => $caixa->id]))
-            ->assertSee('value="' . $caixa->id . '" selected', false);
+            ->assertSee('value="'.$caixa->id.'" selected', false);
     }
 
     public function test_filter_items_without_box(): void

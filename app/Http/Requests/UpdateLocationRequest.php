@@ -15,8 +15,6 @@ class UpdateLocationRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
@@ -46,6 +44,7 @@ class UpdateLocationRequest extends FormRequest
 
                     if ((int) $value === $location->id) {
                         $fail('The location cannot be its own parent.');
+
                         return;
                     }
 

@@ -30,8 +30,6 @@ class UpdateItemRequest extends StoreItemRequest
 
     /**
      * Check if the photo should be removed.
-     *
-     * @return bool
      */
     public function shouldRemovePhoto(): bool
     {
@@ -40,8 +38,6 @@ class UpdateItemRequest extends StoreItemRequest
 
     /**
      * Check if a new photo was uploaded.
-     *
-     * @return bool
      */
     public function hasNewPhoto(): bool
     {

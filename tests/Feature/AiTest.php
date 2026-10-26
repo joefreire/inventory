@@ -74,7 +74,7 @@ class AiTest extends TestCase
         );
 
         Http::assertSent(function (Request $request) {
-            if (!str_ends_with($request->url(), '/v1/systemone')) {
+            if (! str_ends_with($request->url(), '/v1/systemone')) {
                 return false;
             }
 

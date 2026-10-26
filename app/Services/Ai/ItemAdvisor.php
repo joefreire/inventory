@@ -24,8 +24,11 @@ class ItemAdvisor
     public const MAX_FOTOS_IA = 4;
 
     private const MAX_TAGS = 50;
+
     private const MAX_CANDIDATOS = 200;
+
     private const ITENS_POR_LOCAL = 20;
+
     private const MAX_TAGS_NOVAS = 3;
 
     private const VISION_SYSTEM = <<<'PROMPT'
@@ -50,13 +53,11 @@ Nunca use tags genéricas que valem para qualquer peça: componente, eletrica, e
 Se não der para identificar, use name "Peça não identificada" e explique o que aparece na foto.
 PROMPT;
 
-    public function __construct(private readonly OllamaClient $ollama)
-    {
-    }
+    public function __construct(private readonly OllamaClient $ollama) {}
 
     /**
-     * @param array<int, string> $imagePaths Fotos da mesma peca (frente, verso, etiqueta), ate 4
-     * @param array{name?: ?string, description?: ?string} $typed O que ja foi digitado no formulario
+     * @param  array<int, string>  $imagePaths  Fotos da mesma peca (frente, verso, etiqueta), ate 4
+     * @param  array{name?: ?string, description?: ?string}  $typed  O que ja foi digitado no formulario
      * @return array<string, mixed>
      */
     public function analyze(array $imagePaths, array $typed = []): array
@@ -82,9 +83,9 @@ PROMPT;
                 config('ai.models.vision'),
                 self::VISION_SYSTEM,
                 (count($images) > 1
-                    ? 'Estas ' . count($images) . ' fotos são da MESMA peça (frente, verso, etiqueta ou embalagem). Junte o que cada uma mostra.'
+                    ? 'Estas '.count($images).' fotos são da MESMA peça (frente, verso, etiqueta ou embalagem). Junte o que cada uma mostra.'
                     : 'Identifique a peça da foto.')
-                . ($peca['name'] ? " O dono acha que é: {$peca['name']}." : ''),
+                .($peca['name'] ? " O dono acha que é: {$peca['name']}." : ''),
                 $images
             );
             $visionModel = $vision['model'];
@@ -144,8 +145,8 @@ PROMPT;
     }
 
     /**
-     * @param array<string, mixed> $peca
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $peca
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function mergeVision(array $peca, array $data): array
@@ -168,7 +169,7 @@ PROMPT;
             'visible_text' => Str::limit(trim((string) ($data['visible_text'] ?? '')), 200, ''),
             'tags' => array_values(array_filter(
                 array_map(fn ($t) => is_string($t) ? Str::lower(trim($t)) : '', (array) ($data['tags'] ?? [])),
-                fn ($t) => $t !== '' && !self::tagGenerica($t)
+                fn ($t) => $t !== '' && ! self::tagGenerica($t)
             )),
             'quantity' => $quantidade === false ? null : $quantidade,
             'kit' => (bool) ($data['kit'] ?? false),
@@ -224,7 +225,7 @@ PROMPT;
     }
 
     /**
-     * @param Collection<int, Location> $locations
+     * @param  Collection<int, Location>  $locations
      * @return array<string, mixed>
      */
     private function locationQuestion(Collection $locations): array
@@ -236,8 +237,8 @@ PROMPT;
             $conteudo = $location->items->take(self::ITENS_POR_LOCAL)->pluck('name')->implode('; ');
             $criteria["l{$location->id}"] = Str::limit(trim(
                 $location->path
-                . ($location->description ? " ({$location->description})" : '')
-                . ($conteudo ? ". Tem: {$conteudo}" : '. Vazio')
+                .($location->description ? " ({$location->description})" : '')
+                .($conteudo ? ". Tem: {$conteudo}" : '. Vazio')
             ), 600);
         }
         $criteria['nenhum'] = 'Nenhum destes lugares combina com a peca';
@@ -250,7 +251,7 @@ PROMPT;
     }
 
     /**
-     * @param Collection<int, Item> $candidatos
+     * @param  Collection<int, Item>  $candidatos
      * @return array<string, mixed>
      */
     private function duplicateQuestion(Collection $candidatos): array
@@ -258,7 +259,7 @@ PROMPT;
         $criteria = [];
         foreach ($candidatos->take(config('ai.decision_limits.choice_options') - 1) as $item) {
             $criteria["i{$item->id}"] = Str::limit(
-                $item->name . ($item->description ? " - {$item->description}" : ''),
+                $item->name.($item->description ? " - {$item->description}" : ''),
                 300
             );
         }
@@ -272,12 +273,12 @@ PROMPT;
     }
 
     /**
-     * @param array<string, mixed>|null $answer
+     * @param  array<string, mixed>|null  $answer
      * @return array<string, mixed>|null
      */
     private function categoryAnswer(?array $answer): ?array
     {
-        if (!$answer || !isset($answer['choice'])) {
+        if (! $answer || ! isset($answer['choice'])) {
             return null;
         }
 
@@ -292,9 +293,9 @@ PROMPT;
      * Tags existentes que o modelo de decisao aprovou, mais as novas que o
      * modelo de visao sugeriu e que nao existem com outro nome.
      *
-     * @param array<string, mixed> $answers
-     * @param Collection<int, Tag> $tags
-     * @param array<int, string> $sugeridas
+     * @param  array<string, mixed>  $answers
+     * @param  Collection<int, Tag>  $tags
+     * @param  array<int, string>  $sugeridas
      * @return array<int, array<string, mixed>>
      */
     private function tagsAnswer(array $answers, Collection $tags, array $sugeridas): array
@@ -324,7 +325,7 @@ PROMPT;
             $slug = Str::slug(Str::ascii($nome), '');
             $parecida = $slug === '' || collect($existentes)->contains(fn ($e) => $e === $slug
                 || (min(strlen($e), strlen($slug)) >= 4 && (str_contains($slug, $e) || str_contains($e, $slug))));
-            if (!$parecida && $novas < self::MAX_TAGS_NOVAS) {
+            if (! $parecida && $novas < self::MAX_TAGS_NOVAS) {
                 $resultado[] = ['name' => $nome, 'existing' => false, 'probability' => null];
                 $existentes[] = $slug;
                 $novas++;
@@ -335,13 +336,13 @@ PROMPT;
     }
 
     /**
-     * @param array<string, mixed>|null $answer
-     * @param Collection<int, Location> $locations
+     * @param  array<string, mixed>|null  $answer
+     * @param  Collection<int, Location>  $locations
      * @return array<string, mixed>|null
      */
     private function locationAnswer(?array $answer, Collection $locations): ?array
     {
-        if (!$answer || empty($answer['probabilities'])) {
+        if (! $answer || empty($answer['probabilities'])) {
             return null;
         }
 
@@ -365,20 +366,20 @@ PROMPT;
     }
 
     /**
-     * @param array<string, mixed>|null $answer
-     * @param Collection<int, Item> $candidatos
+     * @param  array<string, mixed>|null  $answer
+     * @param  Collection<int, Item>  $candidatos
      * @return array<string, mixed>|null
      */
     private function duplicateAnswer(?array $answer, Collection $candidatos): ?array
     {
         $escolha = $answer['choice'] ?? 'novo';
-        if ($escolha === 'novo' || !str_starts_with($escolha, 'i')) {
+        if ($escolha === 'novo' || ! str_starts_with($escolha, 'i')) {
             return null;
         }
 
         $p = (float) ($answer['probabilities'][$escolha] ?? 0);
         $item = $candidatos->firstWhere('id', (int) substr($escolha, 1));
-        if (!$item || $p < config('ai.thresholds.duplicate')) {
+        if (! $item || $p < config('ai.thresholds.duplicate')) {
             return null;
         }
 

@@ -79,7 +79,7 @@ class NfcTest extends TestCase
 
         $this->get(route('items.create', ['location_id' => $location->id]))
             ->assertOk()
-            ->assertSee('value="' . $location->id . '" selected', false);
+            ->assertSee('value="'.$location->id.'" selected', false);
     }
 
     public function test_nfc_url_uses_fixed_base_when_set(): void

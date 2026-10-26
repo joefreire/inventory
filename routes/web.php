@@ -32,4 +32,4 @@ Route::middleware('auth')->group(function () {
     Route::post('items/{item}/nfc-move', [NfcController::class, 'moveItem'])->name('items.nfc-move');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

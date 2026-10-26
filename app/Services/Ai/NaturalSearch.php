@@ -15,9 +15,7 @@ use Illuminate\Support\Str;
  */
 class NaturalSearch
 {
-    public function __construct(private readonly OllamaClient $ollama)
-    {
-    }
+    public function __construct(private readonly OllamaClient $ollama) {}
 
     /**
      * @return Collection<int, array{item: Item, probability: float}>
@@ -35,11 +33,11 @@ class NaturalSearch
         foreach ($items as $item) {
             $questions["i{$item->id}"] = [
                 'type' => 'noul',
-                'instructions' => 'Este item atende o pedido? Item: ' . Str::limit(
+                'instructions' => 'Este item atende o pedido? Item: '.Str::limit(
                     $item->name
-                    . ($item->category ? " [{$item->category}]" : '')
-                    . ($item->description ? " - {$item->description}" : '')
-                    . ($item->tags->isNotEmpty() ? ' Tags: ' . $item->tags->pluck('name')->implode(', ') : ''),
+                    .($item->category ? " [{$item->category}]" : '')
+                    .($item->description ? " - {$item->description}" : '')
+                    .($item->tags->isNotEmpty() ? ' Tags: '.$item->tags->pluck('name')->implode(', ') : ''),
                     400
                 ),
             ];

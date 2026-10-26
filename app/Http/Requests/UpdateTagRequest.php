@@ -14,8 +14,6 @@ class UpdateTagRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
@@ -33,7 +31,7 @@ class UpdateTagRequest extends FormRequest
         $tag = $this->route('tag');
 
         return [
-            'name' => 'required|string|max:100|unique:tags,name,' . $tag->id,
+            'name' => 'required|string|max:100|unique:tags,name,'.$tag->id,
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
         ];
     }

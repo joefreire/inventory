@@ -7,10 +7,10 @@ use App\Http\Requests\UpdateItemRequest;
 use App\Models\Item;
 use App\Models\Location;
 use App\Models\Tag;
-use App\Services\ItemService;
 use App\Services\Ai\AiException;
 use App\Services\Ai\ItemAdvisor;
 use App\Services\Ai\NaturalSearch;
+use App\Services\ItemService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,8 +27,6 @@ class ItemController extends Controller
 {
     /**
      * Create a new controller instance.
-     *
-     * @param ItemService $itemService
      */
     public function __construct(
         private readonly ItemService $itemService
@@ -36,9 +34,6 @@ class ItemController extends Controller
 
     /**
      * Display a paginated list of items with filters.
-     *
-     * @param Request $request
-     * @return View
      */
     public function index(Request $request): View
     {
@@ -79,8 +74,6 @@ class ItemController extends Controller
 
     /**
      * Show the form for creating a new item.
-     *
-     * @return View
      */
     public function create(Request $request): View
     {
@@ -93,9 +86,6 @@ class ItemController extends Controller
 
     /**
      * Store a newly created item.
-     *
-     * @param StoreItemRequest $request
-     * @return RedirectResponse
      */
     public function store(StoreItemRequest $request): RedirectResponse
     {
@@ -119,9 +109,6 @@ class ItemController extends Controller
 
     /**
      * Display the specified item.
-     *
-     * @param Item $item
-     * @return View
      */
     public function show(Item $item): View
     {
@@ -133,9 +120,6 @@ class ItemController extends Controller
 
     /**
      * Show the form for editing the specified item.
-     *
-     * @param Item $item
-     * @return View
      */
     public function edit(Item $item): View
     {
@@ -148,10 +132,6 @@ class ItemController extends Controller
 
     /**
      * Update the specified item.
-     *
-     * @param UpdateItemRequest $request
-     * @param Item $item
-     * @return RedirectResponse
      */
     public function update(UpdateItemRequest $request, Item $item): RedirectResponse
     {
@@ -170,9 +150,6 @@ class ItemController extends Controller
 
     /**
      * Remove the specified item.
-     *
-     * @param Item $item
-     * @return RedirectResponse
      */
     public function destroy(Item $item): RedirectResponse
     {
@@ -186,16 +163,12 @@ class ItemController extends Controller
     /**
      * Sugere o cadastro pela foto e/ou pelo que já foi digitado: nome,
      * descrição, specs, categoria, tags, caixa e se a peça já existe.
-     *
-     * @param Request $request
-     * @param ItemAdvisor $advisor
-     * @return JsonResponse
      */
     public function analyze(Request $request, ItemAdvisor $advisor): JsonResponse
     {
         $request->validate([
             'photo' => 'nullable|image|max:10240',
-            'photos' => 'nullable|array|max:' . ItemAdvisor::MAX_FOTOS_IA,
+            'photos' => 'nullable|array|max:'.ItemAdvisor::MAX_FOTOS_IA,
             'photos.*' => 'image|max:10240',
             'name' => 'nullable|required_without_all:photo,photos|string|max:255',
             'description' => 'nullable|string|max:1000',
@@ -216,7 +189,7 @@ class ItemController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'A IA não respondeu: ' . $e->getMessage(),
+                'message' => 'A IA não respondeu: '.$e->getMessage(),
             ], 502);
         }
 
@@ -225,10 +198,6 @@ class ItemController extends Controller
 
     /**
      * Busca em linguagem natural ("tenho algo pra medir temperatura?").
-     *
-     * @param Request $request
-     * @param NaturalSearch $search
-     * @return View
      */
     public function ask(Request $request, NaturalSearch $search): View
     {
@@ -241,7 +210,7 @@ class ItemController extends Controller
                 $results = $search->search($pergunta);
             } catch (AiException $e) {
                 Log::warning('IA: falha na busca', ['error' => $e->getMessage()]);
-                $error = 'A IA não respondeu: ' . $e->getMessage();
+                $error = 'A IA não respondeu: '.$e->getMessage();
             }
         }
 
@@ -250,10 +219,6 @@ class ItemController extends Controller
 
     /**
      * Soma ou tira unidades (botoes + e - da tela do item). Nunca fica negativo.
-     *
-     * @param Request $request
-     * @param Item $item
-     * @return JsonResponse
      */
     public function quantity(Request $request, Item $item): JsonResponse
     {
@@ -264,16 +229,12 @@ class ItemController extends Controller
         return response()->json([
             'success' => true,
             'quantity' => $item->quantity,
-            'message' => "{$item->quantity} " . ($item->quantity === 1 ? 'unidade' : 'unidades'),
+            'message' => "{$item->quantity} ".($item->quantity === 1 ? 'unidade' : 'unidades'),
         ]);
     }
 
     /**
      * Move an item to a different location.
-     *
-     * @param Request $request
-     * @param Item $item
-     * @return JsonResponse
      */
     public function move(Request $request, Item $item): JsonResponse
     {

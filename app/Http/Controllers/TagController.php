@@ -20,8 +20,6 @@ class TagController extends Controller
 {
     /**
      * Display a paginated list of all tags.
-     *
-     * @return View
      */
     public function index(): View
     {
@@ -34,8 +32,6 @@ class TagController extends Controller
 
     /**
      * Show the form for creating a new tag.
-     *
-     * @return View
      */
     public function create(): View
     {
@@ -46,9 +42,6 @@ class TagController extends Controller
      * Store a newly created tag.
      *
      * Returns JSON response for AJAX requests, redirect otherwise.
-     *
-     * @param StoreTagRequest $request
-     * @return JsonResponse|RedirectResponse
      */
     public function store(StoreTagRequest $request): JsonResponse|RedirectResponse
     {
@@ -68,9 +61,6 @@ class TagController extends Controller
 
     /**
      * Display the specified tag and its items.
-     *
-     * @param Tag $tag
-     * @return View
      */
     public function show(Tag $tag): View
     {
@@ -84,9 +74,6 @@ class TagController extends Controller
 
     /**
      * Show the form for editing the specified tag.
-     *
-     * @param Tag $tag
-     * @return View
      */
     public function edit(Tag $tag): View
     {
@@ -95,10 +82,6 @@ class TagController extends Controller
 
     /**
      * Update the specified tag.
-     *
-     * @param UpdateTagRequest $request
-     * @param Tag $tag
-     * @return RedirectResponse
      */
     public function update(UpdateTagRequest $request, Tag $tag): RedirectResponse
     {
@@ -106,14 +89,11 @@ class TagController extends Controller
 
         return redirect()
             ->route('tags.index')
-            ->with('success', "Alterações salvas.");
+            ->with('success', 'Alterações salvas.');
     }
 
     /**
      * Remove the specified tag.
-     *
-     * @param Tag $tag
-     * @return RedirectResponse
      */
     public function destroy(Tag $tag): RedirectResponse
     {
@@ -127,9 +107,6 @@ class TagController extends Controller
 
     /**
      * Search tags by name for autocomplete functionality.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function search(Request $request): JsonResponse
     {

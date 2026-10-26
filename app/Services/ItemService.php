@@ -16,16 +16,16 @@ class ItemService
     /**
      * Create a new item with optional tags and photos (the first one is the main photo).
      *
-     * @param array<string, mixed> $data Validated item data
-     * @param array<string> $tagNames Array of tag names to associate
-     * @param array<int, UploadedFile> $photos Photos in display order
+     * @param  array<string, mixed>  $data  Validated item data
+     * @param  array<string>  $tagNames  Array of tag names to associate
+     * @param  array<int, UploadedFile>  $photos  Photos in display order
      * @return Item The created item
      */
     public function create(array $data, array $tagNames = [], array $photos = []): Item
     {
         $item = Item::create($data);
 
-        if (!empty($tagNames)) {
+        if (! empty($tagNames)) {
             $item->syncTags($tagNames);
         }
 
@@ -39,11 +39,11 @@ class ItemService
     /**
      * Update an existing item with optional tags and photo changes.
      *
-     * @param Item $item The item to update
-     * @param array<string, mixed> $data Validated item data
-     * @param array<string>|null $tagNames Array of tag names (null to keep existing)
-     * @param array<int, UploadedFile> $newPhotos Photos to add after the existing ones
-     * @param array<int, int> $removeMediaIds Ids of this item's photos to remove
+     * @param  Item  $item  The item to update
+     * @param  array<string, mixed>  $data  Validated item data
+     * @param  array<string>|null  $tagNames  Array of tag names (null to keep existing)
+     * @param  array<int, UploadedFile>  $newPhotos  Photos to add after the existing ones
+     * @param  array<int, int>  $removeMediaIds  Ids of this item's photos to remove
      * @return Item The updated item
      */
     public function update(
@@ -74,7 +74,7 @@ class ItemService
     /**
      * Delete an item and its associated media.
      *
-     * @param Item $item The item to delete
+     * @param  Item  $item  The item to delete
      * @return bool True on success
      */
     public function delete(Item $item): bool
@@ -85,8 +85,8 @@ class ItemService
     /**
      * Move an item to a different location.
      *
-     * @param Item $item The item to move
-     * @param int|null $locationId The new location ID (null for no location)
+     * @param  Item  $item  The item to move
+     * @param  int|null  $locationId  The new location ID (null for no location)
      * @return Item The updated item
      */
     public function move(Item $item, ?int $locationId): Item
@@ -99,9 +99,8 @@ class ItemService
     /**
      * Upload a photo to an item's media collection.
      *
-     * @param Item $item The item to attach photo to
-     * @param UploadedFile $photo The photo file
-     * @return void
+     * @param  Item  $item  The item to attach photo to
+     * @param  UploadedFile  $photo  The photo file
      */
     private function uploadPhoto(Item $item, UploadedFile $photo): void
     {

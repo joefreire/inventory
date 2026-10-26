@@ -33,7 +33,7 @@ trait HasDescendants
     /**
      * Check if a given model is a descendant of this model.
      *
-     * @param int $id The ID to check
+     * @param  int  $id  The ID to check
      * @return bool True if the ID is a descendant
      */
     public function isDescendant(int $id): bool
@@ -47,7 +47,7 @@ trait HasDescendants
      * Prevents circular references by checking if the potential parent
      * is not this model itself or one of its descendants.
      *
-     * @param int|null $parentId The potential parent ID
+     * @param  int|null  $parentId  The potential parent ID
      * @return bool True if the parent assignment is valid
      */
     public function canHaveParent(?int $parentId): bool
@@ -60,6 +60,6 @@ trait HasDescendants
             return false;
         }
 
-        return !$this->isDescendant($parentId);
+        return ! $this->isDescendant($parentId);
     }
 }

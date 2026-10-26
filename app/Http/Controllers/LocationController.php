@@ -22,8 +22,6 @@ class LocationController extends Controller
 {
     /**
      * Create a new controller instance.
-     *
-     * @param LocationService $locationService
      */
     public function __construct(
         private readonly LocationService $locationService
@@ -31,8 +29,6 @@ class LocationController extends Controller
 
     /**
      * Display a list of root locations with their children.
-     *
-     * @return View
      */
     public function index(): View
     {
@@ -47,9 +43,6 @@ class LocationController extends Controller
 
     /**
      * Show the form for creating a new location.
-     *
-     * @param Request $request
-     * @return View
      */
     public function create(Request $request): View
     {
@@ -62,9 +55,6 @@ class LocationController extends Controller
 
     /**
      * Store a newly created location.
-     *
-     * @param StoreLocationRequest $request
-     * @return RedirectResponse
      */
     public function store(StoreLocationRequest $request): RedirectResponse
     {
@@ -77,9 +67,6 @@ class LocationController extends Controller
 
     /**
      * Display the specified location and its items.
-     *
-     * @param Location $location
-     * @return View
      */
     public function show(Location $location): View
     {
@@ -102,9 +89,6 @@ class LocationController extends Controller
 
     /**
      * Show the form for editing the specified location.
-     *
-     * @param Location $location
-     * @return View
      */
     public function edit(Location $location): View
     {
@@ -117,10 +101,6 @@ class LocationController extends Controller
 
     /**
      * Update the specified location.
-     *
-     * @param UpdateLocationRequest $request
-     * @param Location $location
-     * @return RedirectResponse
      */
     public function update(UpdateLocationRequest $request, Location $location): RedirectResponse
     {
@@ -128,14 +108,11 @@ class LocationController extends Controller
 
         return redirect()
             ->route('locations.index')
-            ->with('success', "Alterações salvas.");
+            ->with('success', 'Alterações salvas.');
     }
 
     /**
      * Remove the specified location.
-     *
-     * @param Location $location
-     * @return RedirectResponse
      */
     public function destroy(Location $location): RedirectResponse
     {
@@ -149,8 +126,6 @@ class LocationController extends Controller
 
     /**
      * Get the location tree as JSON for API/AJAX requests.
-     *
-     * @return JsonResponse
      */
     public function tree(): JsonResponse
     {

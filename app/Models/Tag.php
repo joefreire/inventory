@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $color
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Item> $items
  * @property-read int $item_count
  */
@@ -36,8 +35,6 @@ class Tag extends Model
      * Bootstrap the model events.
      *
      * Automatically generates a color if not provided.
-     *
-     * @return void
      */
     protected static function booted(): void
     {
@@ -60,8 +57,6 @@ class Tag extends Model
 
     /**
      * Get the count of items with this tag.
-     *
-     * @return int
      */
     public function getItemCountAttribute(): int
     {
@@ -71,15 +66,14 @@ class Tag extends Model
     /**
      * Get or create a tag by name.
      *
-     * @param string $name Tag name
-     * @param string|null $color Optional hex color
-     * @return self
+     * @param  string  $name  Tag name
+     * @param  string|null  $color  Optional hex color
      */
     public static function getOrCreate(string $name, ?string $color = null): self
     {
         $tag = static::where('name', $name)->first();
 
-        if (!$tag) {
+        if (! $tag) {
             $tag = static::create([
                 'name' => $name,
                 'color' => $color ?? static::generateColor(),

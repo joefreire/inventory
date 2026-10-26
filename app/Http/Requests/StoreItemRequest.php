@@ -17,8 +17,6 @@ class StoreItemRequest extends FormRequest
 
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
@@ -43,7 +41,7 @@ class StoreItemRequest extends FormRequest
             'tags' => 'nullable|string',
             'photo' => 'nullable|image|max:10240',
             // varias fotos da mesma peca (frente, verso, etiqueta)
-            'photos' => 'nullable|array|max:' . self::MAX_FOTOS,
+            'photos' => 'nullable|array|max:'.self::MAX_FOTOS,
             'photos.*' => 'image|max:10240',
             'ai_metadata' => 'nullable|json',
         ];
@@ -53,12 +51,10 @@ class StoreItemRequest extends FormRequest
      * Prepare the data for validation.
      *
      * Sets default quantity to 1 if not provided.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
-        if (!$this->has('quantity') || $this->quantity === null) {
+        if (! $this->has('quantity') || $this->quantity === null) {
             $this->merge(['quantity' => 1]);
         }
     }
@@ -96,7 +92,7 @@ class StoreItemRequest extends FormRequest
 
         return array_filter(
             array_map('trim', explode(',', $tags)),
-            fn($tag) => !empty($tag)
+            fn ($tag) => ! empty($tag)
         );
     }
 

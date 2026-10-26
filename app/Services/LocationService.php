@@ -19,7 +19,7 @@ class LocationService
      * Recursively transforms locations and their children into a nested array
      * suitable for JSON responses or tree-based UI components.
      *
-     * @param Collection<int, Location> $locations Collection of root locations
+     * @param  Collection<int, Location>  $locations  Collection of root locations
      * @return array<int, array<string, mixed>> Nested tree array
      */
     public function buildTree(Collection $locations): array

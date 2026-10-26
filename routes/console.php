@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
 use App\Models\User;
+use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 
@@ -22,7 +22,7 @@ Artisan::command('inventario:usuario {email} {--name=Dono}', function (string $e
         ['email' => $email],
         ['name' => $this->option('name'), 'password' => Hash::make($senha)]
     );
-    $this->info(($user->wasRecentlyCreated ? 'Criado' : 'Senha trocada') . ": {$user->email}");
+    $this->info(($user->wasRecentlyCreated ? 'Criado' : 'Senha trocada').": {$user->email}");
 
     return 0;
 })->purpose('Cria o usuario do inventario ou troca a senha');

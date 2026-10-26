@@ -17,15 +17,15 @@ trait HasPhotoUrls
     /**
      * Get the URL for a photo in the specified conversion size.
      *
-     * @param string $conversion The media conversion name ('thumb', 'preview', or empty for original)
-     * @param string $collection The media collection name
+     * @param  string  $conversion  The media conversion name ('thumb', 'preview', or empty for original)
+     * @param  string  $collection  The media collection name
      * @return string|null The URL or null if no photo exists
      */
     public function getPhotoUrl(string $conversion = '', string $collection = 'photos'): ?string
     {
         $media = $this->getFirstMedia($collection);
 
-        if (!$media) {
+        if (! $media) {
             return null;
         }
 
@@ -34,8 +34,6 @@ trait HasPhotoUrls
 
     /**
      * Get the thumbnail photo URL (200x200).
-     *
-     * @return string|null
      */
     public function getMainPhotoUrlAttribute(): ?string
     {
@@ -44,8 +42,6 @@ trait HasPhotoUrls
 
     /**
      * Get the preview photo URL (800x800).
-     *
-     * @return string|null
      */
     public function getPreviewPhotoUrlAttribute(): ?string
     {
@@ -54,8 +50,6 @@ trait HasPhotoUrls
 
     /**
      * Get the original photo URL.
-     *
-     * @return string|null
      */
     public function getOriginalPhotoUrlAttribute(): ?string
     {
