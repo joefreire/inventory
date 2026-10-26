@@ -180,10 +180,12 @@ Run PHPUnit tests (a IA e simulada com `Http::fake`):
 php8.4 artisan test
 ```
 
-Run Playwright E2E tests:
+Run Playwright E2E tests (gera o front e sobe um servidor proprio na porta 8001, com banco
+`database/e2e.sqlite` recriado a cada execucao e IA sem chave; o banco do dia a dia nao e tocado):
 ```bash
-npx playwright test
+npm run e2e
 ```
+Os testes rodam com viewport de celular (Pixel 7). Pare o `npm run dev` antes: o E2E testa o build.
 
 ## Project Structure
 

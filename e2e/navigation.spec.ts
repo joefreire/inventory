@@ -1,113 +1,57 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test.describe('Navigation', () => {
-  test('should load home page and redirect to items', async ({ page }) => {
+  test('home opens the parts list', async ({ page }) => {
     await page.goto('/');
-    // Home redirects to items
-    await expect(page).toHaveURL(/\/items/);
+    await expect(page).toHaveURL(/\/items$/);
+    await expect(page).toHaveTitle(/Peças · Inventário/);
   });
 
-  test('should have correct title', async ({ page }) => {
+  test('tab bar reaches every section', async ({ page }) => {
     await page.goto('/items');
-    // The title includes "Itens" for items page
-    await expect(page).toHaveTitle(/Itens/);
+    const tabs = page.getByRole('navigation', { name: 'Navegação principal' });
+
+    await tabs.getByRole('link', { name: 'Caixas' }).click();
+    await expect(page).toHaveURL(/\/locations$/);
+    await expect(page.getByRole('heading', { name: 'Caixas' })).toBeVisible();
+
+    await tabs.getByRole('link', { name: 'Tags' }).click();
+    await expect(page).toHaveURL(/\/tags$/);
+
+    await tabs.getByRole('link', { name: 'Perguntar' }).click();
+    await expect(page).toHaveURL(/\/items\/ask$/);
+
+    await tabs.getByRole('link', { name: 'Cadastrar peça' }).click();
+    await expect(page).toHaveURL(/\/items\/create$/);
+    await expect(page.getByRole('heading', { name: 'Cadastrar peça' })).toBeVisible();
+
+    await tabs.getByRole('link', { name: 'Peças' }).click();
+    await expect(page).toHaveURL(/\/items$/);
   });
 
-  test('should navigate to items from navbar', async ({ page }) => {
+  test('the active tab follows the page', async ({ page }) => {
     await page.goto('/locations');
-    await page.click('.navbar a:has-text("Itens")');
-    await expect(page).toHaveURL(/\/items/);
+    const tabs = page.getByRole('navigation', { name: 'Navegação principal' });
+    await expect(tabs.getByRole('link', { name: 'Caixas' })).toHaveClass(/active/);
+    await expect(tabs.getByRole('link', { name: 'Peças' })).not.toHaveClass(/active/);
   });
 
-  test('should navigate to locations from navbar', async ({ page }) => {
-    await page.goto('/items');
-    await page.click('.navbar a:has-text("Locais")');
-    await expect(page).toHaveURL(/\/locations/);
+  test('no console errors and no CSP violations on the main pages', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+    page.on('pageerror', (err) => errors.push(err.message));
+    for (const path of ['/items', '/items/create', '/locations', '/locations/create', '/tags', '/items/ask']) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+    }
+    expect(errors).toEqual([]);
   });
 
-  test('should navigate to tags from navbar', async ({ page }) => {
-    await page.goto('/items');
-    await page.click('.navbar a:has-text("Tags")');
-    await expect(page).toHaveURL(/\/tags/);
-  });
-
-  test('should perform global search from navbar', async ({ page }) => {
-    // Create an item first
-    await page.goto('/items/create');
-    const uniqueName = `BuscaGlobal${Date.now()}`;
-    await page.fill('input#name', uniqueName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await submitBtn.click();
-    await page.waitForURL(/items\/\d+$/, { timeout: 10000 });
-
-    // Go to locations and use navbar search
-    await page.goto('/locations');
-    const searchInput = page.locator('.navbar input[name="search"]');
-    await searchInput.fill(uniqueName);
-    await searchInput.press('Enter');
-
-    // Should find the item
-    await expect(page.locator('body')).toContainText(uniqueName);
-  });
-
-  test('should show flash messages after actions', async ({ page }) => {
-    // Create an item
-    await page.goto('/items/create');
-    const itemName = `FlashTest${Date.now()}`;
-    await page.fill('input#name', itemName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await submitBtn.click();
-    await page.waitForURL(/items\/\d+$/, { timeout: 10000 });
-
-    // Flash messages should have been shown (might be gone already if auto-dismiss)
-    // Just verify the page loaded correctly
-    await expect(page.locator('body')).toContainText(itemName);
-  });
-
-  test('should have quick add button in navbar', async ({ page }) => {
-    await page.goto('/items');
-
-    // Click add button in navbar
-    await page.click('.navbar a.btn-success');
-
-    await expect(page).toHaveURL(/\/items\/create/);
-  });
-
-  test('should be responsive on mobile viewport', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/items');
-
-    // Page should still be functional
-    await expect(page).toHaveTitle(/Itens/);
-
-    // Navbar should be collapsed - check for hamburger menu
-    const hamburger = page.locator('.navbar-toggler');
-    await expect(hamburger).toBeVisible();
-
-    // Click hamburger to expand menu
-    await hamburger.click();
-
-    // Menu should expand and show links
-    await expect(page.locator('.navbar-nav')).toBeVisible();
-  });
-
-  test('should navigate from item show to edit', async ({ page }) => {
-    // Create an item
-    await page.goto('/items/create');
-    const itemName = `NavTest${Date.now()}`;
-    await page.fill('input#name', itemName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await submitBtn.click();
-    await page.waitForURL(/items\/\d+$/, { timeout: 10000 });
-
-    // On show page, click edit
-    await page.click('a:has-text("Editar")');
-
-    // Should be on edit page
-    await expect(page).toHaveURL(/\/edit/);
+  test('security headers are sent', async ({ page }) => {
+    const response = await page.goto('/items');
+    const headers = response!.headers();
+    expect(headers['content-security-policy']).toContain("script-src 'self'");
+    expect(headers['x-frame-options']).toBe('DENY');
+    expect(headers['x-content-type-options']).toBe('nosniff');
   });
 });

@@ -1,42 +1,46 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * See https://playwright.dev/docs/test-configuration.
+ * E2E against a server of its own (scripts/e2e-server.sh): port 8001, database
+ * database/e2e.sqlite recreated on every run, AI without a key.
+ * The front comes from public/build: run `npm run build` first (`npm run e2e` does).
+ * Each worker logs in once (e2e/fixtures.ts); auth.spec.ts runs without a session.
  */
+const port = Number(process.env.E2E_PORT ?? 8001);
+
 export default defineConfig({
   testDir: './e2e',
-  /* Run tests in files in parallel */
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  workers: process.env.CI ? 1 : 4,
+  reporter: process.env.CI ? 'line' : [['list'], ['html', { open: 'never' }]],
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://127.0.0.1:8000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    baseURL: `http://127.0.0.1:${port}`,
+    locale: 'pt-BR',
+    trace: 'retain-on-failure',
   },
 
-  /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // the owner uses the app on the phone; each worker logs in once (e2e/fixtures.ts)
+      use: { ...devices['Pixel 7'] },
+      testIgnore: /auth\.spec\.ts/,
+    },
+    {
+      name: 'anonymous',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /auth\.spec\.ts/,
     },
   ],
 
-  /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'php artisan serve',
-    url: 'http://127.0.0.1:8000',
-    reuseExistingServer: !process.env.CI,
+    command: 'scripts/e2e-server.sh',
+    url: `http://127.0.0.1:${port}/login`,
+    env: { E2E_PORT: String(port) },
+    // always a fresh database: never reuse a server left running
+    reuseExistingServer: false,
     timeout: 120000,
   },
 });

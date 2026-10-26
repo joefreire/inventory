@@ -274,7 +274,8 @@ textarea.form-control { min-height: 96px; }
 }
 .action-dock .inner { max-width: 720px; margin: 0 auto; display: flex; gap: 10px; }
 .action-dock .btn { flex: 1; }
-.has-dock { padding-bottom: 84px; }
+/* tabbar + dock: the last field of a long form must stay tappable above both */
+.has-dock { padding-bottom: calc(var(--bar-h) + var(--safe-b) + 84px); }
 
 /* Avisos */
 .toast-wrap { position: fixed; left: 0; right: 0; z-index: 1090; bottom: calc(var(--bar-h) + var(--safe-b) + 14px); display: flex; justify-content: center; pointer-events: none; padding: 0 16px; }

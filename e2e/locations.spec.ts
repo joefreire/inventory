@@ -1,126 +1,100 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { acceptConfirm, createItem, createLocation, unique } from './helpers';
 
-test.describe('Locations', () => {
-  test('should display locations index page', async ({ page }) => {
+test.describe('Boxes', () => {
+  test('creates a box and shows its NFC link', async ({ page }) => {
+    const name = unique('Caixa ESPs');
+    await createLocation(page, name);
+
+    await expect(page.locator('.tape', { hasText: name })).toBeVisible();
+    await expect(page.getByText('Caixa vazia.', { exact: false })).toBeVisible();
+    await expect(page.locator('#nfcUrl')).toHaveValue(/\/n\/[a-z0-9]{4,16}$/);
+  });
+
+  test('the NFC link opens the box', async ({ page }) => {
+    const name = unique('Caixa tag');
+    const boxUrl = await createLocation(page, name);
+    const tagPath = new URL(await page.locator('#nfcUrl').inputValue()).pathname;
+
+    await page.goto('/items');
+    await page.goto(tagPath);
+    await expect(page).toHaveURL(boxUrl);
+  });
+
+  test('a box inside another shows in both places', async ({ page }) => {
+    const parent = unique('Armario');
+    const parentUrl = await createLocation(page, parent);
+
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    await page.getByRole('link', { name: 'Nova caixa dentro desta' }).click();
+    await expect(page.getByLabel('Dentro de').locator('option:checked')).toHaveText(parent);
+
+    const child = unique('Gaveta');
+    await page.getByLabel('Nome na etiqueta').fill(child);
+    await page.getByRole('button', { name: 'Criar caixa' }).click();
+    await page.waitForURL(/\/locations$/);
+
+    await page.goto(parentUrl);
+    await page.getByRole('link', { name: child }).click();
+    await expect(page.getByRole('link', { name: parent })).toBeVisible();
+  });
+
+  test('"Cadastrar aqui" preselects the box', async ({ page }) => {
+    const name = unique('Caixa sensores');
+    await createLocation(page, name);
+
+    await page.getByRole('link', { name: 'Cadastrar aqui' }).click();
+    await expect(page).toHaveURL(/\/items\/create\?location_id=\d+$/);
+    await expect(page.getByLabel('Caixa', { exact: true }).locator('option:checked')).toHaveText(name);
+  });
+
+  test('"Guardar item aqui" moves an existing part into the box', async ({ page }) => {
+    const part = unique('Buzzer');
+    await createItem(page, { name: part });
+    const box = unique('Caixa som');
+    const boxUrl = await createLocation(page, box);
+
+    await page.getByRole('button', { name: 'Guardar item aqui' }).click();
+    const sheet = page.locator('#guardarItem');
+    await sheet.getByLabel('Filtrar peças').fill(part.toLowerCase());
+    await sheet.getByRole('button', { name: part }).click();
+
+    await page.waitForURL(boxUrl);
+    await expect(page.locator('.rows').getByRole('link', { name: part })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '1 peça' })).toBeVisible();
+  });
+
+  test('edits a box', async ({ page }) => {
+    const boxUrl = await createLocation(page, unique('Caixa velha'));
+
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    await page.getByRole('link', { name: 'Editar caixa' }).click();
+    const newName = unique('Caixa nova');
+    await page.getByLabel('Nome na etiqueta').fill(newName);
+    await page.getByLabel('Onde fica').fill('prateleira de cima');
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+
+    await page.waitForURL(/\/locations$/);
+    await page.goto(boxUrl);
+    await expect(page.locator('.tape', { hasText: newName })).toBeVisible();
+    await expect(page.getByText('prateleira de cima')).toBeVisible();
+  });
+
+  test('deleting a box leaves its parts without a box', async ({ page }) => {
+    const box = unique('Caixa que sai');
+    await createLocation(page, box);
+    const itemUrl = await createItem(page, { name: unique('Transistor'), location: box });
+
     await page.goto('/locations');
-    await expect(page).toHaveTitle(/Locais/);
-    await expect(page.locator('h2')).toContainText('Locais');
-  });
+    await page.getByRole('link', { name: box }).click();
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    await page.getByRole('link', { name: 'Editar caixa' }).click();
+    acceptConfirm(page);
+    await page.getByRole('button', { name: 'Excluir caixa' }).click();
 
-  test('should navigate to create location page', async ({ page }) => {
-    await page.goto('/locations');
-    await page.click('a:has-text("Novo Local")');
-    await expect(page).toHaveURL(/locations\/create/);
-    await expect(page.locator('.card-header')).toContainText('Novo Local');
-  });
-
-  test('should create a new location', async ({ page }) => {
-    await page.goto('/locations/create');
-
-    const locationName = `EscritorioE2E${Date.now()}`;
-
-    await page.fill('input#name', locationName);
-    await page.fill('textarea#description', 'Descricao do local de teste');
-
-    // Click submit and wait for redirect
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Should show location in the list after redirect
-    await expect(page.locator('body')).toContainText(locationName);
-  });
-
-  test('should create hierarchical locations', async ({ page }) => {
-    // Create parent location
-    await page.goto('/locations/create');
-    const parentName = `CasaE2E${Date.now()}`;
-    await page.fill('input#name', parentName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Create child location
-    await page.goto('/locations/create');
-    const childName = `QuartoE2E${Date.now()}`;
-    await page.fill('input#name', childName);
-    await page.selectOption('select#parent_id', { label: parentName });
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Verify child was created in the list
-    await expect(page.locator('body')).toContainText(childName);
-  });
-
-  test('should view location details', async ({ page }) => {
-    // Create a location
-    await page.goto('/locations/create');
-    const locationName = `LocalDetalhes${Date.now()}`;
-    await page.fill('input#name', locationName);
-    await page.fill('textarea#description', 'Descricao para visualizar');
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Click on the location link
-    await page.click(`a:has-text("${locationName}")`);
-
-    // Should show details
-    await expect(page.locator('h2')).toContainText(locationName);
-  });
-
-  test('should edit a location', async ({ page }) => {
-    // Create a location
-    await page.goto('/locations/create');
-    const originalName = `LocalEditar${Date.now()}`;
-    await page.fill('input#name', originalName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Click on the location
-    await page.click(`a:has-text("${originalName}")`);
-    await page.waitForURL(/locations\/\d+$/);
-
-    // Click edit
-    await page.click('a:has-text("Editar"), a[href*="edit"]');
-    await expect(page).toHaveURL(/\/edit/);
-
-    // Update the name
-    const newName = `LocalEditado${Date.now()}`;
-    await page.fill('input#name', newName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Should show updated name in list
-    await expect(page.locator('body')).toContainText(newName);
-  });
-
-  test('should delete a location', async ({ page }) => {
-    // Create a location
-    await page.goto('/locations/create');
-    const locationName = `LocalExcluir${Date.now()}`;
-    await page.fill('input#name', locationName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Click on the location
-    await page.click(`a:has-text("${locationName}")`);
-    await page.waitForURL(/locations\/\d+$/);
-
-    // Click button that opens the delete modal
-    await page.click('button[data-bs-toggle="modal"][data-bs-target="#deleteModal"]');
-
-    // Wait for modal to be visible
-    await page.waitForSelector('#deleteModal.show', { state: 'visible' });
-
-    // Click the delete button inside the modal
-    await page.click('#deleteModal form button[type="submit"]');
-    await page.waitForURL(/\/locations/, { timeout: 10000 });
-
-    // Should be on locations list
-    await expect(page).toHaveURL(/\/locations/);
+    await page.waitForURL(/\/locations$/);
+    await expect(page.getByRole('link', { name: box })).toHaveCount(0);
+    await page.goto(itemUrl);
+    await expect(page.getByText('Ainda sem caixa.')).toBeVisible();
   });
 });

@@ -1,149 +1,85 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { acceptConfirm, createItem, unique } from './helpers';
+
+function tagName(prefix: string): string {
+  return unique(prefix).replace(' ', '-').toLowerCase();
+}
 
 test.describe('Tags', () => {
-  test('should display tags index page', async ({ page }) => {
+  test('creates a tag with a color', async ({ page }) => {
+    const name = tagName('smd');
+    await page.goto('/tags/create');
+    await page.getByLabel('Nome').fill(name);
+    await page.getByRole('textbox', { name: 'Cor', exact: true }).fill('#aa3366');
+    await page.getByRole('button', { name: 'Criar tag' }).click();
+
+    await page.waitForURL(/\/tags$/);
+    const row = page.getByRole('link', { name });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.tag-dot')).toHaveAttribute('style', /#aa3366/);
+  });
+
+  test('refuses an invalid color', async ({ page }) => {
+    await page.goto('/tags/create');
+    await page.getByLabel('Nome').fill(tagName('cor-ruim'));
+    await page.getByRole('textbox', { name: 'Cor', exact: true }).fill('vermelho');
+    await page.getByRole('button', { name: 'Criar tag' }).click();
+    // the browser blocks the submit (pattern) or the server sends it back
+    await expect(page).toHaveURL(/\/tags\/create$/);
+  });
+
+  test('the tag page lists its parts', async ({ page }) => {
+    const tag = tagName('wifi');
+    const part = unique('ESP8266');
+    await createItem(page, { name: part, tags: tag });
+
     await page.goto('/tags');
-    await expect(page).toHaveTitle(/Tags/);
-    await expect(page.locator('h2')).toContainText('Tags');
+    await page.getByRole('link', { name: tag }).click();
+    await expect(page).toHaveURL(/\/tags\/\d+$/);
+    await expect(page.getByText('1 peça', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: part })).toBeVisible();
   });
 
-  test('should navigate to create tag page', async ({ page }) => {
+  test('renames a tag and the part shows the new name', async ({ page }) => {
+    const tag = tagName('velha');
+    const itemUrl = await createItem(page, { name: unique('Display OLED'), tags: tag });
+
     await page.goto('/tags');
-    await page.click('a:has-text("Nova Tag")');
-    await expect(page).toHaveURL(/tags\/create/);
-    await expect(page.locator('.card-header')).toContainText('Nova Tag');
+    await page.getByRole('link', { name: tag }).click();
+    await page.getByRole('link', { name: 'Editar tag' }).click();
+    const renamed = tagName('nova');
+    await page.getByLabel('Nome').fill(renamed);
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+
+    await page.waitForURL(/\/tags$/);
+    await page.goto(itemUrl);
+    await expect(page.getByRole('link', { name: renamed })).toBeVisible();
   });
 
-  test('should create a new tag', async ({ page }) => {
-    await page.goto('/tags/create');
+  test('deleting a tag keeps the parts', async ({ page }) => {
+    const tag = tagName('excluir');
+    const part = unique('Bateria 18650');
+    const itemUrl = await createItem(page, { name: part, tags: tag });
 
-    const tagName = `eletronica-e2e-${Date.now()}`;
+    await page.goto('/tags');
+    await page.getByRole('link', { name: tag }).click();
+    await page.getByRole('link', { name: 'Editar tag' }).click();
+    acceptConfirm(page);
+    await page.getByRole('button', { name: 'Excluir tag' }).click();
 
-    await page.fill('input#name', tagName);
-    await page.fill('input#color', '#ff5500');
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Should show tag in the list
-    await expect(page.locator('body')).toContainText(tagName);
+    await page.waitForURL(/\/tags$/);
+    await expect(page.getByRole('link', { name: tag })).toHaveCount(0);
+    await page.goto(itemUrl);
+    await expect(page.getByRole('heading', { name: part })).toBeVisible();
+    await expect(page.getByRole('link', { name: tag })).toHaveCount(0);
   });
 
-  test('should create tag with default color', async ({ page }) => {
-    await page.goto('/tags/create');
+  test('tapping a suggested tag adds it to the form', async ({ page }) => {
+    const tag = tagName('sugerida');
+    await createItem(page, { name: unique('Primeira'), tags: tag });
 
-    const tagName = `tag-default-${Date.now()}`;
-
-    await page.fill('input#name', tagName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Should show tag
-    await expect(page.locator('body')).toContainText(tagName);
-  });
-
-  test('should view tag details', async ({ page }) => {
-    // Create a tag
-    await page.goto('/tags/create');
-    const tagName = `tag-detalhes-${Date.now()}`;
-    await page.fill('input#name', tagName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Click on the tag
-    await page.click(`a:has-text("${tagName}")`);
-
-    // Should show tag name in badge
-    await expect(page.locator('.badge.fs-4')).toContainText(tagName);
-  });
-
-  test('should edit a tag', async ({ page }) => {
-    // Create a tag
-    await page.goto('/tags/create');
-    const originalName = `tag-editar-${Date.now()}`;
-    await page.fill('input#name', originalName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Click on the tag
-    await page.click(`a:has-text("${originalName}")`);
-    await page.waitForURL(/tags\/\d+$/);
-
-    // Click edit
-    await page.click('a:has-text("Editar")');
-    await expect(page).toHaveURL(/\/edit/);
-
-    // Update the name
-    const newName = `tag-editada-${Date.now()}`;
-    await page.fill('input#name', newName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Should show updated name in list
-    await expect(page.locator('body')).toContainText(newName);
-  });
-
-  test('should show color preview when creating tag', async ({ page }) => {
-    await page.goto('/tags/create');
-
-    const tagName = `preview-test-${Date.now()}`;
-    await page.fill('input#name', tagName);
-
-    // The preview should update
-    await expect(page.locator('#tagPreviewName')).toContainText(tagName);
-  });
-
-  test('should add tag to item', async ({ page }) => {
-    // Create a tag
-    await page.goto('/tags/create');
-    const tagName = `filtro-tag-${Date.now()}`;
-    await page.fill('input#name', tagName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Create an item with this tag
     await page.goto('/items/create');
-    const itemName = `ItemComTag${Date.now()}`;
-    await page.fill('input#name', itemName);
-    await page.fill('input#tags', tagName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await submitBtn.click();
-    await page.waitForURL(/items\/\d+$/, { timeout: 10000 });
-
-    // Should show tag on item page
-    await expect(page.locator('body')).toContainText(tagName);
-  });
-
-  test('should delete a tag', async ({ page }) => {
-    // Create a tag
-    await page.goto('/tags/create');
-    const tagName = `tag-excluir-${Date.now()}`;
-    await page.fill('input#name', tagName);
-
-    await page.click('.card-body form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Click on the tag
-    await page.click(`a:has-text("${tagName}")`);
-    await page.waitForURL(/tags\/\d+$/);
-
-    // Click button that opens the delete modal
-    await page.click('button[data-bs-toggle="modal"][data-bs-target="#deleteModal"]');
-
-    // Wait for modal to be visible
-    await page.waitForSelector('#deleteModal.show', { state: 'visible' });
-
-    // Click the delete button inside the modal
-    await page.click('#deleteModal form button[type="submit"]');
-    await page.waitForURL(/\/tags/, { timeout: 10000 });
-
-    // Should be on tags list
-    await expect(page).toHaveURL(/\/tags/);
+    await page.getByRole('button', { name: tag }).click();
+    await expect(page.getByLabel('Tags', { exact: true })).toHaveValue(new RegExp(tag));
   });
 });

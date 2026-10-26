@@ -1,151 +1,162 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { acceptConfirm, createItem, createLocation, fillItem, unique } from './helpers';
 
-test.describe('Items', () => {
-  test('should display items index page', async ({ page }) => {
+test.describe('Parts', () => {
+  test('registers a part without a photo', async ({ page }) => {
+    const name = unique('Resistor 10k');
+    await createItem(page, { name, quantity: 25, description: 'Resistor de filme 1/4W' });
+
+    await expect(page.locator('#qtyValue')).toHaveText('25');
+    await expect(page.getByText('Resistor de filme 1/4W')).toBeVisible();
+    await expect(page.getByText('Ainda sem caixa.')).toBeVisible();
+    await expect(page.locator('.toast-wrap')).toContainText('Peça salva.');
+  });
+
+  test('the form refuses a part without a name', async ({ page }) => {
+    await page.goto('/items/create');
+    await page.getByRole('button', { name: 'Salvar peça' }).click();
+    await expect(page).toHaveURL(/\/items\/create$/);
+    await expect(page.locator('.toast-wrap')).toContainText('Falta o nome da peça.');
+  });
+
+  test('"Sugerir pelo nome" without a name asks for it', async ({ page }) => {
+    await page.goto('/items/create');
+    await page.getByRole('button', { name: /Sugerir pelo nome/ }).click();
+    await expect(page.locator('.toast-wrap')).toContainText('Digite o nome da peça primeiro.');
+  });
+
+  test('saves tags typed on the form and filters by them', async ({ page }) => {
+    const tag = unique('e2e-tag').replace(' ', '-').toLowerCase();
+    const name = unique('ESP32 DevKit');
+    await createItem(page, { name, tags: `${tag}, wifi` });
+
+    await page.getByRole('link', { name: tag }).click();
+    await expect(page).toHaveURL(/\/items\?tag_id=\d+$/);
+    await expect(page.getByRole('link', { name })).toBeVisible();
+    await expect(page.locator('.rows .row-item')).toHaveCount(1);
+  });
+
+  test('search finds the part by name', async ({ page }) => {
+    const name = unique('Sensor DS18B20');
+    await createItem(page, { name });
+
     await page.goto('/items');
-    await expect(page).toHaveTitle(/Itens/);
-    await expect(page.locator('body')).toContainText('Todos os Itens');
+    await page.getByRole('searchbox', { name: 'Buscar' }).fill(name);
+    await page.getByRole('searchbox', { name: 'Buscar' }).press('Enter');
+    await expect(page).toHaveURL(/search=/);
+    await expect(page.getByRole('link', { name })).toBeVisible();
+    await expect(page.getByText('1 peça para')).toBeVisible();
   });
 
-  test('should navigate to create item page', async ({ page }) => {
-    await page.goto('/items');
-    await page.click('a:has-text("Novo Item")');
-    await expect(page).toHaveURL(/items\/create/);
-    await expect(page.locator('.card-header')).toContainText('Adicionar Novo Item');
+  test('search with no match offers to ask', async ({ page }) => {
+    await page.goto('/items?search=' + encodeURIComponent(unique('nada-com-isso')));
+    await expect(page.getByRole('heading', { name: 'Nada com esse filtro' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Perguntar' }).first()).toBeVisible();
   });
 
-  test('should create a new item', async ({ page }) => {
+  test('edits a part', async ({ page }) => {
+    const itemUrl = await createItem(page, { name: unique('Capacitor') });
+
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    await page.getByRole('link', { name: 'Editar peça' }).click();
+    await expect(page).toHaveURL(/\/edit$/);
+
+    const newName = unique('Capacitor 100uF');
+    await fillItem(page, { name: newName, quantity: 7 });
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+
+    await expect(page).toHaveURL(itemUrl);
+    await expect(page.getByRole('heading', { name: newName })).toBeVisible();
+    await expect(page.locator('#qtyValue')).toHaveText('7');
+  });
+
+  test('the stepper changes the quantity and it sticks', async ({ page }) => {
+    await createItem(page, { name: unique('LED vermelho'), quantity: 3 });
+
+    const plus = page.getByRole('button', { name: 'Somar uma' });
+    const minus = page.getByRole('button', { name: 'Tirar uma' });
+    const saved = () => page.waitForResponse((r) => r.url().endsWith('/quantity') && r.ok());
+
+    await Promise.all([saved(), plus.click()]);
+    await Promise.all([saved(), plus.click()]);
+    await Promise.all([saved(), minus.click()]);
+    await expect(page.locator('#qtyValue')).toHaveText('4');
+
+    await page.reload();
+    await expect(page.locator('#qtyValue')).toHaveText('4');
+  });
+
+  test('the stepper does not go below zero', async ({ page }) => {
+    await createItem(page, { name: unique('Fusivel'), quantity: 1 });
+    const minus = page.getByRole('button', { name: 'Tirar uma' });
+
+    await Promise.all([page.waitForResponse((r) => r.url().endsWith('/quantity')), minus.click()]);
+    await expect(page.locator('#qtyValue')).toHaveText('0');
+    await expect(page.locator('#qtyLabel')).toHaveText('unidades');
+    await minus.click();
+    await expect(page.locator('#qtyValue')).toHaveText('0');
+  });
+
+  test('changes the box from the part page', async ({ page }) => {
+    const box = unique('Gaveta');
+    await createLocation(page, box);
+    await createItem(page, { name: unique('Relé 5V') });
+
+    await page.getByRole('button', { name: /Trocar caixa/ }).click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/move') && r.ok()),
+      page.locator('#trocarCaixa').getByRole('button', { name: box }).click(),
+    ]);
+    // the page reloads itself after the move
+    await expect(page.locator('.rows .tape', { hasText: box })).toBeVisible();
+  });
+
+  test('"Salvar e próxima" returns to the form in the same box', async ({ page }) => {
+    const box = unique('Caixa sequencia');
+    await createLocation(page, box);
+    const name = unique('Diodo');
+
     await page.goto('/items/create');
+    await fillItem(page, { name, location: box });
+    await page.getByRole('button', { name: 'Salvar e próxima' }).click();
 
-    const itemName = `ItemTesteE2E${Date.now()}`;
-
-    await page.fill('input#name', itemName);
-    await page.fill('textarea#description', 'Descricao do item de teste');
-    await page.fill('input#quantity', '5');
-
-    // Click submit button in the form, not in navbar
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
-
-    // Should have item name visible after redirect
-    await expect(page.locator('body')).toContainText(itemName);
+    await expect(page).toHaveURL(/\/items\/create\?location_id=\d+$/);
+    await expect(page.getByLabel('Caixa', { exact: true }).locator('option:checked')).toHaveText(box);
+    await expect(page.getByLabel('Nome', { exact: true })).toHaveValue('');
+    await expect(page.locator('.toast-wrap')).toContainText(`Peça salva: ${name}. Pode tirar a próxima foto.`);
   });
 
-  test('should search items', async ({ page }) => {
-    // First create an item
-    await page.goto('/items/create');
-    const uniqueName = `ResistorBusca${Date.now()}`;
-    await page.fill('input#name', uniqueName);
+  test('deletes a part after confirming', async ({ page }) => {
+    const name = unique('Peça descartável');
+    await createItem(page, { name });
 
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    acceptConfirm(page);
+    await page.getByRole('button', { name: 'Excluir peça' }).click();
 
-    // Now search for it
-    await page.goto('/items');
-    const searchInput = page.locator('.navbar input[name="search"]');
-    await searchInput.fill(uniqueName);
-    await searchInput.press('Enter');
-
-    // Should find the item
-    await expect(page.locator('body')).toContainText(uniqueName);
+    await expect(page).toHaveURL(/\/items$/);
+    await page.goto('/items?search=' + encodeURIComponent(name));
+    await expect(page.getByRole('heading', { name: 'Nada com esse filtro' })).toBeVisible();
   });
 
-  test('should view item details', async ({ page }) => {
-    // First create an item
-    await page.goto('/items/create');
-    const itemName = `ItemDetalhe${Date.now()}`;
-    await page.fill('input#name', itemName);
-    await page.fill('textarea#description', 'Descricao do item');
+  test('cancelling the confirm keeps the part', async ({ page }) => {
+    const itemUrl = await createItem(page, { name: unique('Peça que fica') });
 
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
+    await page.getByRole('button', { name: 'Mais ações' }).click();
+    page.once('dialog', (dialog) => dialog.dismiss());
+    await page.getByRole('button', { name: 'Excluir peça' }).click();
 
-    // Should show item details
-    await expect(page.locator('body')).toContainText(itemName);
-    await expect(page.locator('body')).toContainText('Descricao do item');
+    await expect(page).toHaveURL(itemUrl);
   });
 
-  test('should edit an item', async ({ page }) => {
-    // First create an item
+  test('AI without a key answers with an error, not a fake success', async ({ page }) => {
     await page.goto('/items/create');
-    const originalName = `ItemEditar${Date.now()}`;
-    await page.fill('input#name', originalName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
+    await page.getByLabel('Nome', { exact: true }).fill('Arduino Nano');
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/items/analyze')),
+      page.getByRole('button', { name: /Sugerir pelo nome/ }).click(),
     ]);
-
-    // Click edit
-    await page.click('a:has-text("Editar")');
-    await expect(page).toHaveURL(/edit/);
-
-    // Update the name
-    const newName = `ItemEditado${Date.now()}`;
-    await page.fill('input#name', newName);
-
-    const editSubmitBtn = page.locator('form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      editSubmitBtn.click(),
-    ]);
-
-    // Should show updated name
-    await expect(page.locator('body')).toContainText(newName);
-  });
-
-  test('should delete an item', async ({ page }) => {
-    // First create an item
-    await page.goto('/items/create');
-    const itemName = `ItemExcluir${Date.now()}`;
-    await page.fill('input#name', itemName);
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
-
-    // Click button that opens the delete modal
-    await page.click('button[data-bs-toggle="modal"][data-bs-target="#deleteModal"]');
-
-    // Wait for modal to be visible
-    await page.waitForSelector('#deleteModal.show', { state: 'visible' });
-
-    // Click the delete button inside the modal
-    await Promise.all([
-      page.waitForNavigation(),
-      page.click('#deleteModal form button[type="submit"]'),
-    ]);
-
-    // Should redirect to items list
-    await expect(page).toHaveURL(/\/items/);
-  });
-
-  test('should add tags to item', async ({ page }) => {
-    // Create an item with tags
-    await page.goto('/items/create');
-    const itemName = `ItemComTags${Date.now()}`;
-    await page.fill('input#name', itemName);
-    await page.fill('input#tags', 'eletronica, teste, e2e');
-
-    const submitBtn = page.locator('#itemForm button[type="submit"], form button.btn-primary');
-    await Promise.all([
-      page.waitForNavigation(),
-      submitBtn.click(),
-    ]);
-
-    // Should show tags
-    await expect(page.locator('body')).toContainText('eletronica');
+    expect(response.ok()).toBe(false);
+    await expect(page.getByLabel('Nome', { exact: true })).toHaveValue('Arduino Nano');
   });
 });
