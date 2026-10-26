@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
  * Each item becomes a yes/no question ("does this item serve the request?");
  * batches go in parallel. To keep cost bounded as the inventory grows, at most
  * `max_items` items are judged: the most recently changed ones. Same question
- * within `cache_minutes` and no item changed in between = cached answer.
+ * within `cache_minutes` about the same items (name, category, description,
+ * tags: exactly what the model reads) = cached answer.
  */
 final class NaturalSearch
 {
@@ -43,10 +44,11 @@ final class NaturalSearch
             return collect();
         }
 
+        $questions = $this->questions($items);
         $answers = $this->cache->remember(
-            $this->cacheKey($request, $items),
+            $this->cacheKey($request, $questions),
             now()->addMinutes($this->cacheMinutes),
-            fn () => $this->model->decide(['pedido' => $request], $this->questions($items))
+            fn () => $this->model->decide(['pedido' => $request], $questions)
         );
 
         return $items
@@ -84,12 +86,13 @@ final class NaturalSearch
     }
 
     /**
-     * @param  EloquentCollection<int, Item>  $items
+     * Changing only a part's tags (or renaming a tag) does not touch
+     * items.updated_at, so the key comes from the questions themselves.
+     *
+     * @param  array<string, array<string, mixed>>  $questions
      */
-    private function cacheKey(string $request, EloquentCollection $items): string
+    private function cacheKey(string $request, array $questions): string
     {
-        $version = $items->max('updated_at')?->timestamp.'-'.$items->count();
-
-        return 'ai:search:'.sha1(Str::lower($request).'|'.$version);
+        return 'ai:search:'.sha1(Str::lower($request).'|'.json_encode($questions));
     }
 }

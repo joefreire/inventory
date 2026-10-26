@@ -346,4 +346,25 @@ class ItemControllerTest extends TestCase
 
         $this->assertDatabaseMissing('items', ['name' => 'Foto do iPhone']);
     }
+
+    public function test_edit_keeps_a_category_that_left_the_config(): void
+    {
+        $item = Item::create(['name' => 'Rele antigo', 'category' => 'categoria-que-saiu']);
+
+        $this->put(route('items.update', $item), [
+            'name' => 'Rele antigo',
+            'category' => 'categoria-que-saiu',
+            'notes' => 'ainda edita',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('items.show', $item));
+
+        $this->assertSame('ainda edita', $item->fresh()->notes);
+    }
+
+    public function test_edit_still_refuses_an_unknown_category(): void
+    {
+        $item = Item::create(['name' => 'Rele', 'category' => array_key_first(config('ai.categories'))]);
+
+        $this->put(route('items.update', $item), ['name' => 'Rele', 'category' => 'inventada'])
+            ->assertSessionHasErrors('category');
+    }
 }

@@ -311,4 +311,17 @@ class AiTest extends TestCase
 
         Http::assertSentCount(2); // the failure was not remembered
     }
+
+    public function test_search_cache_sees_a_tag_only_change(): void
+    {
+        $item = Item::create(['name' => 'Sensor']);
+        Http::fake(['ollama.test/*' => Http::response(['answers' => []])]);
+
+        $this->get(route('items.ask', ['q' => 'medir temperatura']))->assertOk();
+        $item->syncTags(['ds18b20']); // does not change items.updated_at
+        $this->get(route('items.ask', ['q' => 'medir temperatura']))->assertOk();
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request) => str_contains(json_encode($request['questions']), 'ds18b20'));
+    }
 }
