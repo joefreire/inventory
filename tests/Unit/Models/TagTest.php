@@ -4,6 +4,7 @@ namespace Tests\Unit\Models;
 
 use App\Models\Item;
 use App\Models\Tag;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -65,7 +66,7 @@ class TagTest extends TestCase
     {
         Tag::create(['name' => 'eletronica']);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         Tag::create(['name' => 'eletronica']);
     }

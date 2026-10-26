@@ -4,10 +4,10 @@ namespace App\Providers;
 
 use App\Ai\Contracts\DecisionModel;
 use App\Ai\Contracts\VisionModel;
+use App\Ai\Decisions\CategoryDecision;
 use App\Ai\Decisions\DuplicateCandidates;
 use App\Ai\Decisions\DuplicateDecision;
 use App\Ai\Decisions\LocationDecision;
-use App\Ai\Decisions\CategoryDecision;
 use App\Ai\Decisions\TagsDecision;
 use App\Ai\Identification\PartIdentifier;
 use App\Ai\ItemAdvisor;

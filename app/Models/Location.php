@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Locations\NfcCode;
 use App\Models\Traits\HasDescendants;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Storage location model with hierarchical tree structure.
@@ -20,11 +23,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $path
  * @property int $depth
  * @property string|null $nfc_code
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Location|null $parent
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Location> $children
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Item> $items
+ * @property-read Collection<int, Location> $children
+ * @property-read Collection<int, Item> $items
  * @property-read string $full_path
  * @property-read int|null $items_count withCount('items')
  * @property int|null $items_total set by App\Locations\LocationTree
@@ -159,7 +162,7 @@ class Location extends Model
     public static function newNfcCode(): string
     {
         do {
-            $code = \App\Locations\NfcCode::random();
+            $code = NfcCode::random();
         } while (self::where('nfc_code', $code)->exists());
 
         return $code;

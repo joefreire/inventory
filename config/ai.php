@@ -1,5 +1,10 @@
 <?php
 
+use App\Ai\Decisions\CategoryDecision;
+use App\Ai\Decisions\DuplicateDecision;
+use App\Ai\Decisions\LocationDecision;
+use App\Ai\Decisions\TagsDecision;
+
 /*
  * IA do inventario: Ollama Cloud com dois tipos de modelo.
  *
@@ -84,10 +89,10 @@ return [
     // chamada so. Pergunta nova = classe que implementa
     // App\Ai\Decisions\PartDecision, listada aqui.
     'decisions' => [
-        App\Ai\Decisions\CategoryDecision::class,
-        App\Ai\Decisions\TagsDecision::class,
-        App\Ai\Decisions\LocationDecision::class,
-        App\Ai\Decisions\DuplicateDecision::class,
+        CategoryDecision::class,
+        TagsDecision::class,
+        LocationDecision::class,
+        DuplicateDecision::class,
     ],
 
     // Busca em linguagem natural: quantos itens no maximo sao avaliados (os

@@ -171,7 +171,7 @@ php artisan storage:link
 | POST | `/tags` | Create new tag |
 | GET | `/tags/search` | Search tags (JSON) |
 
-See [docs/API.md](docs/API.md) for detailed API documentation.
+As rotas JSON são internas da interface (sem API pública).
 
 ## Testing
 

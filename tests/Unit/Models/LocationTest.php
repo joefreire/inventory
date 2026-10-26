@@ -2,9 +2,11 @@
 
 namespace Tests\Unit\Models;
 
+use App\Locations\LocationTree;
 use App\Models\Item;
 use App\Models\Location;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class LocationTest extends TestCase
@@ -80,9 +82,9 @@ class LocationTest extends TestCase
         Item::create(['name' => 'Item 2', 'location_id' => $child->id]);
         Item::create(['name' => 'Item 3', 'location_id' => $child->id]);
 
-        \Illuminate\Support\Facades\DB::enableQueryLog();
-        $roots = app(\App\Locations\LocationTree::class)->roots();
-        $this->assertCount(1, \Illuminate\Support\Facades\DB::getQueryLog());
+        DB::enableQueryLog();
+        $roots = app(LocationTree::class)->roots();
+        $this->assertCount(1, DB::getQueryLog());
 
         $this->assertSame(3, $roots[0]->items_total);
         $this->assertSame(2, $roots[0]->children[0]->items_total);

@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreLocationRequest;
 use App\Http\Requests\UpdateLocationRequest;
-use App\Models\Item;
 use App\Locations\LocationTree;
+use App\Models\Item;
 use App\Models\Location;
 use App\Services\LocationService;
 use Illuminate\Http\JsonResponse;

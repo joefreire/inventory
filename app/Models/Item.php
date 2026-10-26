@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Models\Traits\HasPhotoUrls;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
@@ -26,11 +29,11 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property int $quantity
  * @property string|null $notes
  * @property array<string, mixed>|null $ai_metadata
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Location|null $location
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Tag> $tags
- * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
+ * @property-read Collection<int, Tag> $tags
+ * @property-read MediaCollection<int, Media> $media
  * @property-read string|null $main_photo_url
  * @property-read string|null $preview_photo_url
  * @property-read string|null $original_photo_url

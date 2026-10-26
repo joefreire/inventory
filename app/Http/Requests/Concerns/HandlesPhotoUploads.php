@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Concerns;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
 /**
@@ -26,7 +27,7 @@ trait HandlesPhotoUploads
         $image = File::image()
             ->types(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'])
             ->max(self::$maxPhotoKb)
-            ->dimensions(\Illuminate\Validation\Rule::dimensions()->maxWidth(self::$maxPhotoSide)->maxHeight(self::$maxPhotoSide));
+            ->dimensions(Rule::dimensions()->maxWidth(self::$maxPhotoSide)->maxHeight(self::$maxPhotoSide));
 
         return [
             'photo' => ['nullable', $image],
