@@ -101,8 +101,44 @@ export default function init() {
         byId('ai_description').value = d.description || '';
         byId('ai_metadata').value = JSON.stringify({ specs: d.specs || {}, visible_text: d.visible_text || '', models: d.models || {}, photos_used: d.photos_used || 0 });
 
-        area.innerHTML = renderDuplicate(d.duplicate) + renderSuggestion(d);
+        area.innerHTML = renderPurchase(d.purchase) + renderDuplicate(d.duplicate) + renderSuggestion(d);
+        bindPurchase(d.purchase);
         bindDuplicate(d.duplicate);
+    }
+
+    // the form may already come from a purchase line (hidden field filled): nothing to suggest then
+    function renderPurchase(p) {
+        const field = form.querySelector('[name="purchase_item_id"]');
+        if (!p || field?.value) return '';
+        const date = p.ordered_at ? ` (${esc(p.ordered_at.split('-').reverse().join('/'))})` : '';
+        return `<div class="dup mb-3" data-purchase-card>
+            <strong>Parece o item da compra?</strong> ${pct(p.probability)}
+            <div class="d-flex gap-2 align-items-center my-1">
+                ${p.photo_url ? `<img src="${esc(p.photo_url)}" class="thumb" alt="Foto do anúncio" width="48" height="48">` : ''}
+                <div>Parece o item <b>${esc(p.name)}</b> do pedido ${esc(p.order_number)}${date}</div>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-dark flex-fill" data-purchase="yes">É este</button>
+                <button type="button" class="btn btn-sm btn-light flex-fill" data-purchase="no">Não é</button>
+            </div></div>`;
+    }
+
+    function bindPurchase(p) {
+        const card = area.querySelector('[data-purchase-card]');
+        if (!p || !card) return;
+        card.querySelector('[data-purchase="yes"]').addEventListener('click', () => {
+            let field = form.querySelector('[name="purchase_item_id"]');
+            if (!field) {
+                field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = 'purchase_item_id';
+                form.appendChild(field);
+            }
+            field.value = String(p.id);
+            byId('quantity').value = p.suggested_quantity;
+            card.innerHTML = `<strong>Ligada à compra ${esc(p.order_number)}.</strong> Ao salvar, a peça entra com ${esc(p.suggested_quantity)} un.`;
+        });
+        card.querySelector('[data-purchase="no"]').addEventListener('click', () => card.remove());
     }
 
     function renderDuplicate(dup) {

@@ -8,6 +8,7 @@ use App\Ai\Decisions\CategoryDecision;
 use App\Ai\Decisions\DuplicateCandidates;
 use App\Ai\Decisions\DuplicateDecision;
 use App\Ai\Decisions\LocationDecision;
+use App\Ai\Decisions\PurchaseDecision;
 use App\Ai\Decisions\TagsDecision;
 use App\Ai\Identification\PartIdentifier;
 use App\Ai\ItemAdvisor;
@@ -80,6 +81,10 @@ class AiServiceProvider extends ServiceProvider
             $app->make(DecisionModel::class),
             $app->make(DuplicateCandidates::class),
             (float) $app['config']->get('ai.thresholds.duplicate'),
+        ));
+        $this->app->bind(PurchaseDecision::class, fn (Application $app) => new PurchaseDecision(
+            $app->make(DecisionModel::class),
+            (float) $app['config']->get('ai.thresholds.purchase'),
         ));
 
         $this->app->bind(ItemAdvisor::class, fn (Application $app) => new ItemAdvisor(

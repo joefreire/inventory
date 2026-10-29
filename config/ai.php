@@ -3,6 +3,7 @@
 use App\Ai\Decisions\CategoryDecision;
 use App\Ai\Decisions\DuplicateDecision;
 use App\Ai\Decisions\LocationDecision;
+use App\Ai\Decisions\PurchaseDecision;
 use App\Ai\Decisions\TagsDecision;
 
 /*
@@ -41,6 +42,7 @@ return [
     'thresholds' => [
         'tag' => 0.7,
         'duplicate' => 0.6,
+        'purchase' => 0.6,
         'location' => 0.4,
         'search' => 0.5,
     ],
@@ -93,6 +95,7 @@ return [
         TagsDecision::class,
         LocationDecision::class,
         DuplicateDecision::class,
+        PurchaseDecision::class,
     ],
 
     // Busca em linguagem natural: quantos itens no maximo sao avaliados (os

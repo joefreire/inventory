@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Item;
 use App\Models\Location;
+use App\Models\PurchaseItem;
+use App\Models\PurchaseOrder;
 use App\Models\Tag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -323,5 +325,74 @@ class AiTest extends TestCase
 
         Http::assertSentCount(2);
         Http::assertSent(fn (Request $request) => str_contains(json_encode($request['questions']), 'ds18b20'));
+    }
+
+    private function purchaseLine(string $title, array $attrs = []): PurchaseItem
+    {
+        static $n = 0;
+        $order = PurchaseOrder::create([
+            'source' => 'aliexpress', 'number' => 'P'.++$n, 'status' => 'delivered', 'ordered_at' => '2026-10-20',
+        ]);
+
+        return PurchaseItem::create($attrs + [
+            'purchase_order_id' => $order->id,
+            'line_key' => PurchaseItem::lineKey($title, null),
+            'title_truncated' => $title,
+            'quantity' => 2,
+            'pack_quantity' => 10,
+        ]);
+    }
+
+    public function test_analysis_suggests_matching_purchase_item(): void
+    {
+        $line = $this->purchaseLine('Sensor DS18B20 waterproof', ['variant' => 'Cabo 1m']);
+
+        Http::fake([
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'compra' => ['type' => 'choice', 'choice' => "p{$line->id}", 'probabilities' => ["p{$line->id}" => 0.8, 'nenhum' => 0.1]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Sensor DS18B20'])
+            ->assertOk()
+            ->assertJsonPath('data.purchase.id', $line->id)
+            ->assertJsonPath('data.purchase.name', 'Sensor DS18B20 waterproof')
+            ->assertJsonPath('data.purchase.order_number', $line->order->number)
+            ->assertJsonPath('data.purchase.suggested_quantity', 20);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/v1/systemone')
+            && str_contains($request['questions']['compra']['criteria']["p{$line->id}"], 'Cabo 1m'));
+    }
+
+    public function test_no_purchase_suggestion_below_threshold_or_without_candidates(): void
+    {
+        $line = $this->purchaseLine('Sensor DS18B20');
+        $this->purchaseLine('Ja ligada', ['item_id' => Item::create(['name' => 'X', 'quantity' => 1])->id]);
+
+        Http::fake([
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'compra' => ['type' => 'choice', 'choice' => "p{$line->id}", 'probabilities' => ["p{$line->id}" => 0.4]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Sensor'])
+            ->assertOk()
+            ->assertJsonPath('data.purchase', null);
+
+        Http::assertSent(fn (Request $request) => ! str_contains(json_encode($request['questions']), 'Ja ligada'));
+
+        PurchaseItem::query()->delete();
+        Http::fake([
+            'ollama.test/v1/systemone' => Http::response(['answers' => [
+                'categoria' => ['type' => 'choice', 'choice' => 'sensor', 'probabilities' => ['sensor' => 0.9]],
+            ]]),
+        ]);
+
+        $this->postJson(route('items.analyze'), ['name' => 'Sensor'])
+            ->assertOk()
+            ->assertJsonPath('data.purchase', null);
+
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/v1/systemone')
+            && ! isset($request['questions']['compra']));
     }
 }
