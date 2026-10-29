@@ -77,7 +77,7 @@ class EnrichPurchaseItem implements ShouldQueue
         }
 
         try {
-            $response = Http::timeout(20)->get($url);
+            $response = Http::timeout(20)->withoutRedirecting()->get($url);
         } catch (ConnectionException) {
             $item->update(['enrichment_error' => 'Não foi possível baixar a foto']);
             throw new AiException('Não foi possível baixar a foto');

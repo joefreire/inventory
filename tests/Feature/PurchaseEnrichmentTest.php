@@ -102,7 +102,7 @@ class PurchaseEnrichmentTest extends TestCase
     public function test_disallowed_image_host_is_refused_without_request(): void
     {
         Http::fake();
-        $hosts = ['https://evil.test/x.jpg', 'https://aliexpress-media.com.evil.test/x.jpg', 'https://evilaliexpress-media.com/x.jpg', 'http://ae-pic-a1.aliexpress-media.com/x.jpg'];
+        $hosts = ['https://evil.test/x.jpg', 'https://aliexpress-media.com.evil.test/x.jpg', 'https://evilaliexpress-media.com/x.jpg', 'http://ae-pic-a1.aliexpress-media.com/x.jpg', 'https://aliexpress-media.com@evil.test/x.jpg'];
 
         foreach ($hosts as $url) {
             $item = $this->item(['image_url' => $url]);
@@ -113,6 +113,25 @@ class PurchaseEnrichmentTest extends TestCase
             $this->assertNull($item->enriched_at);
         }
         Http::assertNothingSent();
+    }
+
+    public function test_redirect_is_not_followed(): void
+    {
+        Http::fake([
+            'ae-pic-a1.aliexpress-media.com/*' => Http::response('', 302, ['Location' => 'https://evil.test/x.jpg']),
+            'evil.test/*' => Http::response($this->png()),
+        ]);
+        $item = $this->item();
+
+        try {
+            EnrichPurchaseItem::dispatchSync($item->id);
+        } catch (AiException) {
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'evil.test'));
+        $item->refresh();
+        $this->assertNull($item->enriched_at);
+        $this->assertNotEmpty($item->enrichment_error);
     }
 
     public function test_ai_failure_is_recorded_not_silent(): void
