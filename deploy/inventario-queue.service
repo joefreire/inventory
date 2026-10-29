@@ -1,0 +1,13 @@
+[Unit]
+Description=Inventario - worker da fila (enriquecimento de compras)
+After=network.target
+
+[Service]
+User=www-data
+WorkingDirectory=/var/www/inventario
+ExecStart=/usr/bin/php8.4 artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -229,6 +229,13 @@ Usuario (nao ha cadastro pela tela):
 ssh -t root@100.91.35.23 'cd /var/www/inventario && sudo -u www-data php8.4 artisan inventario:usuario EMAIL'
 ```
 
+Worker da fila (enriquecimento das compras por IA), uma vez:
+```bash
+scp deploy/inventario-queue.service root@100.91.35.23:/etc/systemd/system/
+ssh root@100.91.35.23 'systemctl daemon-reload && systemctl enable --now inventario-queue'
+```
+O deploy reinicia o worker se o servico existir.
+
 Atualizar: `scripts/deploy.sh` (roda `composer check`, gera o front, envia e migra;
 faz cópia do banco antes).
 

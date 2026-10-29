@@ -15,6 +15,7 @@ use App\Ai\Ollama\OllamaDecisionModel;
 use App\Ai\Ollama\OllamaHttp;
 use App\Ai\Ollama\OllamaVisionModel;
 use App\Ai\Search\NaturalSearch;
+use App\Purchases\PurchaseItemEnricher;
 use App\Tags\TagNormalizer;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Client\Factory as Http;
@@ -55,6 +56,11 @@ class AiServiceProvider extends ServiceProvider
             $app->make(VisionModel::class),
             $app->make(TagNormalizer::class),
             resource_path('prompts/identify-part.md'),
+        ));
+
+        $this->app->bind(PurchaseItemEnricher::class, fn (Application $app) => new PurchaseItemEnricher(
+            $app->make(VisionModel::class),
+            resource_path('prompts/complete-purchase-item.md'),
         ));
 
         // decisions: one new instance per analysis (they keep state between questions and answers)

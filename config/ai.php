@@ -102,6 +102,10 @@ return [
         'cache_minutes' => 10,
     ],
 
+    // Unicos hosts de onde a foto oficial de uma compra pode ser baixada
+    // (dominio ou subdominio, so HTTPS).
+    'purchase_image_hosts' => ['aliexpress-media.com', 'alicdn.com'],
+
     // Limite de chamadas a IA por usuario por minuto (custo e abuso).
     'rate_limit_per_minute' => (int) env('AI_RATE_LIMIT', 20),
 ];

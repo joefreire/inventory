@@ -29,6 +29,7 @@ ssh "$HOST" "cd $DIR \
   && php8.4 artisan migrate --force \
   && php8.4 artisan optimize \
   && chown -R www-data:www-data . && chown root:www-data .env && chmod 640 .env \
-  && systemctl reload php8.4-fpm"
+  && systemctl reload php8.4-fpm \
+  && { systemctl is-enabled inventario-queue >/dev/null 2>&1 && systemctl restart inventario-queue || true; }"
 
 curl -fsS -o /dev/null -w 'login: %{http_code}\n' https://inventario.runningwithjoe.com/login

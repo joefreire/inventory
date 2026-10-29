@@ -39,7 +39,7 @@ final class PartIdentifier
         return new PartDescription(
             name: $typedName ?: Str::limit(self::text($data['name'] ?? ''), 80, ''),
             description: $typedDescription ?: Str::limit(self::text($data['description'] ?? ''), 500, ''),
-            specs: $this->specs($data['specs'] ?? []),
+            specs: Specs::normalize($data['specs'] ?? []),
             visibleText: Str::limit(self::text($data['visible_text'] ?? ''), 200, ''),
             suggestedTags: $this->suggestedTags($data['tags'] ?? []),
             quantity: $this->quantity($data['quantity'] ?? null),
@@ -61,23 +61,6 @@ final class PartIdentifier
     private static function text(mixed $value): string
     {
         return is_scalar($value) ? trim((string) $value) : '';
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function specs(mixed $raw): array
-    {
-        $specs = [];
-        foreach (is_array($raw) ? $raw : [] as $key => $value) {
-            $key = Str::slug(Str::ascii((string) $key), '_');
-            $value = self::text($value);
-            if ($key !== '' && $value !== '') {
-                $specs[$key] = Str::limit($value, 200, '');
-            }
-        }
-
-        return $specs;
     }
 
     /**

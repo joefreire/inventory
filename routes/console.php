@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\EnrichPurchaseItem;
+use App\Models\PurchaseItem;
 use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Purchases\PurchaseImporter;
@@ -57,3 +59,16 @@ Artisan::command('compras:pedidos {source}', function (string $source) {
 
     return 0;
 })->purpose('Lista os pedidos ja importados de uma loja');
+
+// Enfileira a IA nos itens de compra ainda nao enriquecidos (--falhas: so os que deram erro).
+Artisan::command('compras:enriquecer {--falhas}', function () {
+    $items = PurchaseItem::whereNull('enriched_at')
+        ->when($this->option('falhas'), fn ($q) => $q->whereNotNull('enrichment_error'))
+        ->pluck('id');
+    foreach ($items as $id) {
+        EnrichPurchaseItem::dispatch($id);
+    }
+    $this->info("Itens na fila: {$items->count()}");
+
+    return 0;
+})->purpose('Enfileira o enriquecimento por IA dos itens de compra pendentes');
