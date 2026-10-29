@@ -125,11 +125,15 @@ class PurchaseImportTest extends TestCase
             ->expectsOutputToContain('Pedidos novos: 2, atualizados: 0, itens novos: 3')
             ->assertExitCode(0);
 
+        // an order known only by its status (no items yet): the skill must fetch its items
+        $this->importer()->import(['source' => 'aliexpress', 'orders' => [['number' => '8215761587024900', 'status' => 'shipped']]]);
+
         $this->assertSame(0, Artisan::call('compras:pedidos', ['source' => 'aliexpress']));
         $this->assertEqualsCanonicalizing(
             [
-                ['number' => '8215761587024729', 'status' => 'shipped'],
-                ['number' => '8215761587024800', 'status' => 'awaiting'],
+                ['number' => '8215761587024729', 'status' => 'shipped', 'items' => 2],
+                ['number' => '8215761587024800', 'status' => 'awaiting', 'items' => 1],
+                ['number' => '8215761587024900', 'status' => 'shipped', 'items' => 0],
             ],
             json_decode(Artisan::output(), true)
         );

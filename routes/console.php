@@ -51,10 +51,11 @@ Artisan::command('compras:importar {file}', function (string $file) {
     return $result->errors === [] ? 0 : 1;
 })->purpose('Importa pedidos de compras de um arquivo JSON');
 
-// Lista pedidos ja importados (a skill le so o que falta).
+// Lista pedidos ja importados (a skill le so o que falta). `items` = 0 num pedido nao
+// final: a skill ainda precisa trazer os itens dele.
 Artisan::command('compras:pedidos {source}', function (string $source) {
-    $orders = PurchaseOrder::where('source', $source)->orderBy('id')->get()
-        ->map(fn (PurchaseOrder $o) => ['number' => $o->number, 'status' => $o->status->value])
+    $orders = PurchaseOrder::where('source', $source)->withCount('items')->orderBy('id')->get()
+        ->map(fn (PurchaseOrder $o) => ['number' => $o->number, 'status' => $o->status->value, 'items' => (int) $o->items_count])
         ->all();
     $this->line((string) json_encode($orders, JSON_UNESCAPED_UNICODE));
 
