@@ -4,6 +4,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NfcController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\TagController;
 use App\Locations\NfcCode;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,10 @@ Route::middleware('auth')->group(function () {
     Route::post('items/{item}/nfc-move', [NfcController::class, 'moveItem'])->name('items.nfc-move');
 
     Route::resource('locations', LocationController::class);
+
+    Route::get('compras', [PurchaseController::class, 'index'])->name('purchases.index');
+    Route::get('compras/importar', [PurchaseController::class, 'import'])->name('purchases.import');
+    Route::post('compras/importar', [PurchaseController::class, 'storeImport'])->name('purchases.import.store');
 
     Route::resource('tags', TagController::class);
 

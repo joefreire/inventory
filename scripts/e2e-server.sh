@@ -21,7 +21,9 @@ fi
 
 export APP_ENV=testing APP_DEBUG=true APP_URL="http://127.0.0.1:$PORT"
 export DB_CONNECTION=sqlite DB_DATABASE="$PWD/database/e2e.sqlite"
-export SESSION_DRIVER=file CACHE_STORE=array QUEUE_CONNECTION=sync
+export SESSION_DRIVER=file CACHE_STORE=array QUEUE_CONNECTION=database
+# fila no banco, sem worker: como em producao, o enriquecimento da importacao fica na fila
+# (com sync, a falha da IA sem chave derrubaria a requisicao de upload)
 export OLLAMA_API_KEY= NFC_BASE_URL=
 export PHP_CLI_SERVER_WORKERS=4
 

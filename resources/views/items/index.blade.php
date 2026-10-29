@@ -147,6 +147,7 @@
 <div class="offcanvas offcanvas-bottom" tabindex="-1" id="menuConta" aria-label="Menu">
     <div class="grabber"></div>
     <div class="offcanvas-body p-0 py-2">
+        <a href="{{ route('purchases.index') }}" class="sheet-action"><i class="bi bi-bag"></i> Compras</a>
         <a href="{{ route('tags.index') }}" class="sheet-action"><i class="bi bi-tags"></i> Tags</a>
         <form action="{{ route('logout') }}" method="POST">
             @csrf
