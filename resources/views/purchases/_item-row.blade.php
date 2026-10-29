@@ -10,7 +10,7 @@
     @endif
     <span class="grow">
         <span class="name">{{ $line->displayName() }}</span>
-        @if($line->name !== null)
+        @if($line->name !== null && $line->name !== $line->title_truncated)
             <span><span class="tape">completado pela IA</span></span>
         @endif
         @if($line->variant)

@@ -103,6 +103,16 @@ class PurchaseProposalTest extends TestCase
         $this->assertSame(0, app(LinkProposer::class)->propose(PurchaseItem::all()));
     }
 
+    public function test_proposer_skips_lines_that_are_not_parts(): void
+    {
+        $item = Item::create(['name' => 'Parafuso M3', 'quantity' => 7]);
+        $this->line(['is_part' => false]);
+        $unknown = $this->line(['is_part' => null]);
+        $this->fakeModel(fn (string $id) => $id === 'p'.$unknown->id ? ['i'.$item->id, 0.9] : throw new \LogicException('non-part asked'));
+
+        $this->assertSame(1, app(LinkProposer::class)->propose(PurchaseItem::all()));
+    }
+
     public function test_confirming_proposals_links_without_changing_quantity(): void
     {
         $item = Item::create(['name' => 'Parafuso M3', 'quantity' => 7]);

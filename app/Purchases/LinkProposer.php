@@ -76,7 +76,7 @@ final class LinkProposer
 
     private function eligible(PurchaseItem $p): bool
     {
-        return $p->enriched_at !== null && $p->item_id === null
+        return $p->enriched_at !== null && $p->item_id === null && $p->is_part !== false
             && $p->dismissed_at === null && $p->proposal_rejected_at === null;
     }
 

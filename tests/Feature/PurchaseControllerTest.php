@@ -70,6 +70,13 @@ class PurchaseControllerTest extends TestCase
             ->assertSee('IA falhou')->assertSee('IA pendente');
     }
 
+    public function test_ai_badge_only_when_the_name_really_changed(): void
+    {
+        $this->line('Igual AI', ['name' => 'Igual AI', 'enriched_at' => now()]);
+
+        $this->get(route('purchases.index'))->assertSee('Igual AI')->assertDontSee('completado pela IA');
+    }
+
     public function test_index_searches_name_and_title(): void
     {
         $this->line('Sonoff rele');
