@@ -236,6 +236,12 @@ ssh root@100.91.35.23 'systemctl daemon-reload && systemctl enable --now inventa
 ```
 O deploy reinicia o worker se o servico existir.
 
+O `.env` de producao precisa de `DB_QUEUE_RETRY_AFTER=660`: o `retry_after` da fila
+tem de passar do maior `timeout` de job (`ProposePurchaseLinks`, 600 s; o
+enriquecimento usa 300 s, igual ao `--timeout` do worker). Com o padrao de 90 s, um job
+lento volta para a fila enquanto ainda roda e a IA e chamada duas vezes. Depois de
+trocar o `.env`: `systemctl restart inventario-queue`.
+
 Atualizar: `scripts/deploy.sh` (roda `composer check`, gera o front, envia e migra;
 faz cópia do banco antes).
 

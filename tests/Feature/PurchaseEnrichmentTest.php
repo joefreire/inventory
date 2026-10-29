@@ -181,4 +181,101 @@ class PurchaseEnrichmentTest extends TestCase
         Artisan::call('compras:enriquecer', ['--falhas' => true]);
         Bus::assertDispatchedTimes(EnrichPurchaseItem::class, 1);
     }
+
+    private function webp(int $width, int $height): string
+    {
+        $im = imagecreatetruecolor($width, $height);
+        ob_start();
+        imagewebp($im);
+
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * The images sent to the vision model in the faked chat request.
+     *
+     * @return list<string> decoded bytes
+     */
+    private function sentImages(): array
+    {
+        $images = [];
+        Http::assertSent(function (Request $r) use (&$images) {
+            if ($r->url() !== 'https://ollama.test/api/chat') {
+                return false;
+            }
+            foreach ($r->data()['messages'] ?? [] as $message) {
+                foreach ($message['images'] ?? [] as $image) {
+                    $images[] = (string) base64_decode($image, true);
+                }
+            }
+
+            return true;
+        });
+
+        return $images;
+    }
+
+    public function test_item_without_image_url_is_enriched_from_the_text_only(): void
+    {
+        Http::fake([
+            'ollama.test/api/chat' => $this->chat(['name' => 'Interruptor Zigbee', 'pack_quantity' => 1, 'is_part' => true]),
+        ]);
+        $item = $this->item(['image_url' => null]);
+
+        EnrichPurchaseItem::dispatchSync($item->id);
+
+        $item->refresh();
+        $this->assertNull($item->enrichment_error);
+        $this->assertNotNull($item->enriched_at);
+        $this->assertSame('Interruptor Zigbee', $item->name);
+        $this->assertSame([], $this->sentImages());
+        Http::assertSent(fn (Request $r) => str_contains((string) json_encode($r->data(), JSON_UNESCAPED_UNICODE), 'Sem foto do anúncio'));
+        $this->assertCount(0, $item->getMedia('photo'));
+    }
+
+    public function test_job_timeout_fits_two_slow_vision_models(): void
+    {
+        $this->assertSame(300, (new EnrichPurchaseItem(1))->timeout);
+        $this->assertStringContainsString('--timeout=300', (string) file_get_contents(base_path('deploy/inventario-queue.service')));
+        $this->assertStringContainsString('DB_QUEUE_RETRY_AFTER=660', (string) file_get_contents(base_path('README.md')));
+    }
+
+    public function test_vision_model_gets_the_preview_jpeg_not_the_original(): void
+    {
+        Http::fake([
+            'ae-pic-a1.aliexpress-media.com/*' => Http::response($this->webp(1600, 1600), 200, ['Content-Type' => 'image/webp']),
+            'ollama.test/api/chat' => $this->chat(['name' => 'Interruptor', 'pack_quantity' => 1, 'is_part' => true]),
+        ]);
+        $item = $this->item();
+
+        EnrichPurchaseItem::dispatchSync($item->id);
+
+        $images = $this->sentImages();
+        $this->assertCount(1, $images);
+        $this->assertSame("\xff\xd8", substr($images[0], 0, 2));
+        $size = getimagesizefromstring($images[0]);
+        $this->assertNotFalse($size);
+        $this->assertLessThanOrEqual(800, max($size[0], $size[1]));
+    }
+
+    public function test_download_that_is_not_an_image_is_refused_and_not_stored(): void
+    {
+        Http::fake([
+            'ae-pic-a1.aliexpress-media.com/*' => Http::response('<html>captcha</html>', 200, ['Content-Type' => 'text/html']),
+            'ollama.test/*' => $this->chat(['name' => 'X']),
+        ]);
+        $item = $this->item();
+
+        try {
+            EnrichPurchaseItem::dispatchSync($item->id);
+            $this->fail('AiException expected so the queue retries');
+        } catch (AiException) {
+        }
+
+        $item->refresh();
+        $this->assertSame('Foto do anúncio inválida', $item->enrichment_error);
+        $this->assertNull($item->enriched_at);
+        $this->assertCount(0, $item->getMedia('photo'));
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'ollama.test'));
+    }
 }

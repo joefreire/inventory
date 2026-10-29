@@ -21,15 +21,18 @@ final class PurchaseItemEnricher
     ) {}
 
     /**
+     * @param  string|null  $imageBase64  the official photo, null when the e-mail had none
      * @return array{name: string, description: string, specs: array<string, string>, pack_quantity: ?int, is_part: bool}
      */
-    public function enrich(PurchaseItem $item, string $imageBase64): array
+    public function enrich(PurchaseItem $item, ?string $imageBase64): array
     {
         $prompt = "Título cortado: {$item->title_truncated}\n"
             .'Variação: '.($item->variant ?: '(nenhuma)')."\n"
-            ."Quantidade comprada: {$item->quantity}";
+            ."Quantidade comprada: {$item->quantity}"
+            .($imageBase64 === null ? "\nSem foto do anúncio: complete só pelo título e pela variação." : '');
 
-        $data = $this->vision->describe((string) file_get_contents($this->promptPath), $prompt, [$imageBase64])['data'];
+        $images = $imageBase64 === null ? [] : [$imageBase64];
+        $data = $this->vision->describe((string) file_get_contents($this->promptPath), $prompt, $images)['data'];
 
         $name = Str::limit(self::text($data['name'] ?? ''), 80, '');
         $pack = filter_var($data['pack_quantity'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_PACK]]);

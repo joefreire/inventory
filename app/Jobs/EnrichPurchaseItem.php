@@ -23,6 +23,13 @@ class EnrichPurchaseItem implements ShouldQueue
     public int $tries = 3;
 
     /**
+     * Two vision models in a row (the second only when the first fails) plus the
+     * photo download. The worker's --timeout and the queue's retry_after must be
+     * above this (deploy/inventario-queue.service, DB_QUEUE_RETRY_AFTER).
+     */
+    public int $timeout = 300;
+
+    /**
      * @var list<int>
      */
     public array $backoff = [60, 300];
@@ -37,7 +44,7 @@ class EnrichPurchaseItem implements ShouldQueue
         }
 
         $media = $item->getFirstMedia('photo');
-        if ($media === null) {
+        if ($media === null && $item->image_url !== null) {
             $bytes = $this->download($item);
             if ($bytes === null) {
                 return;
@@ -45,8 +52,16 @@ class EnrichPurchaseItem implements ShouldQueue
             $media = $item->addMediaFromString($bytes)->usingFileName('photo.jpg')->toMediaCollection('photo');
         }
 
+        // the 800px JPEG preview (generated right away, nonQueued), as in the parts flow;
+        // no photo at all: the AI completes from the text alone
+        $image = null;
+        if ($media !== null) {
+            $path = $media->hasGeneratedConversion('preview') ? $media->getPath('preview') : $media->getPath();
+            $image = base64_encode((string) file_get_contents($path));
+        }
+
         try {
-            $data = $enricher->enrich($item, base64_encode((string) file_get_contents($media->getPath())));
+            $data = $enricher->enrich($item, $image);
         } catch (AiException $e) {
             $item->update(['enrichment_error' => $e->getMessage()]);
             throw $e;
@@ -87,6 +102,12 @@ class EnrichPurchaseItem implements ShouldQueue
         if (! $response->successful() || $body === '' || strlen($body) > self::MAX_IMAGE_BYTES) {
             $item->update(['enrichment_error' => 'Foto do anúncio indisponível']);
             throw new AiException('Foto do anúncio indisponível');
+        }
+
+        // a captcha or error page answered with 200 is not stored: a retry downloads again
+        if (@getimagesizefromstring($body) === false) {
+            $item->update(['enrichment_error' => 'Foto do anúncio inválida']);
+            throw new AiException('Foto do anúncio inválida');
         }
 
         return $body;

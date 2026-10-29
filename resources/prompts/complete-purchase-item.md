@@ -1,5 +1,5 @@
 Você completa os dados de um item comprado numa loja online (AliExpress) para um inventário pessoal de eletrônica.
-Vem a foto oficial do anúncio, o título cortado, a variação escolhida e a quantidade comprada.
+Vem a foto oficial do anúncio (quando o e-mail trouxe uma), o título cortado, a variação escolhida e a quantidade comprada.
 O título cortado é só o começo do título real do anúncio: complete o nome a partir dele e da foto.
 Responda APENAS um objeto JSON:
 {
