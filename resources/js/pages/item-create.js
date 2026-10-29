@@ -155,6 +155,13 @@ export default function init() {
     function bindDuplicate(dup) {
         if (!dup) return;
         area.querySelector('[data-dup="add"]').addEventListener('click', async () => {
+            // from a purchase: join the line to the part (adds quantity x pack and
+            // links it), so it never stays pending to be added again later
+            const purchaseId = form.querySelector('[name="purchase_item_id"]')?.value;
+            if (purchaseId) {
+                joinPurchase(purchaseId, dup.id);
+                return;
+            }
             const units = Math.max(1, Number(byId('quantity').value) || 1);
             try {
                 await api(dup.quantity_url, 'PATCH', { delta: units });
@@ -164,6 +171,22 @@ export default function init() {
             }
         });
         area.querySelector('[data-dup="ignore"]').addEventListener('click', (e) => e.target.closest('.dup').remove());
+    }
+
+    function joinPurchase(purchaseId, itemId) {
+        const join = document.createElement('form');
+        join.method = 'POST';
+        join.action = form.dataset.joinUrlTemplate.replace('__ID__', encodeURIComponent(purchaseId));
+        const fields = { _token: form.querySelector('[name="_token"]').value, item_id: itemId, somar: 1 };
+        Object.entries(fields).forEach(([name, value]) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = String(value);
+            join.appendChild(input);
+        });
+        document.body.appendChild(join);
+        join.submit();
     }
 
     function renderSuggestion(d) {

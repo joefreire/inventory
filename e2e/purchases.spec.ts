@@ -75,6 +75,34 @@ test.describe('Purchases', () => {
     await expect(page.getByRole('heading', { name: 'Compras' })).toBeVisible();
   });
 
+  test('registering from a purchase, "same part: add" joins the purchase instead of only adding', async ({ page }) => {
+    const title = unique('Capacitor junta');
+    const order = String(Date.now()) + String(Math.floor(Math.random() * 1000));
+    const payload = { source: 'aliexpress', orders: [{ number: order, status: 'delivered', items: [{ title_truncated: title, variant: '10 PCS', quantity: 2 }] }] };
+    await page.goto('/compras/importar');
+    await page.getByLabel('Arquivo JSON das compras').setInputFiles({ name: 'p.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
+    await page.getByRole('button', { name: 'Importar' }).click();
+    await expect(page.locator('.toast-wrap')).toContainText('1 pedido novo');
+
+    const name = unique('Capacitor existente');
+    const itemUrl = await createItem(page, { name, quantity: 5 });
+    const itemId = Number(itemUrl.split('/').pop());
+
+    // the AI has no key in the E2E: answer the analysis with a duplicate of that part
+    await page.route('**/items/analyze', (route) => route.fulfill({
+      json: { success: true, data: { name: title, duplicate: { id: itemId, name, quantity: 5, location: null, url: itemUrl, quantity_url: `${itemUrl}/quantity`, probability: 0.95 } } },
+    }));
+    await page.goto(`/compras?mostrar=todos&q=${encodeURIComponent(title)}`);
+    await page.getByRole('link', { name: 'Cadastrar peça' }).first().click();
+    await page.getByRole('button', { name: /Sugerir pelo nome/ }).click();
+    await page.getByRole('button', { name: 'É a mesma: somar' }).click();
+
+    await page.waitForURL(itemUrl);
+    await expect(page.locator('#qtyValue')).toHaveText('7');
+    await page.goto(`/compras?mostrar=todos&q=${encodeURIComponent(title)}`);
+    await expect(page.getByRole('link', { name: 'Já está no estoque' })).toBeVisible();
+  });
+
   test('dismisses a purchase', async ({ page }) => {
     await importFixture(page);
     await page.goto('/compras?mostrar=todos&q=SONOFF');

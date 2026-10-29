@@ -8,7 +8,8 @@
 @section('content')
 <div class="page">
     <form action="{{ route('items.store') }}" method="POST" enctype="multipart/form-data" id="itemForm" novalidate
-          data-analyze-url="{{ route('items.analyze') }}" data-max-ai-photos="{{ \App\Ai\ItemAdvisor::MAX_PHOTOS }}">
+          data-analyze-url="{{ route('items.analyze') }}" data-max-ai-photos="{{ \App\Ai\ItemAdvisor::MAX_PHOTOS }}"
+          data-join-url-template="{{ route('purchases.items.join', ['purchaseItem' => '__ID__']) }}">
         @csrf
 
         @if($purchase)

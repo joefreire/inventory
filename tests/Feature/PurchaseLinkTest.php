@@ -56,6 +56,18 @@ class PurchaseLinkTest extends TestCase
             ->assertSee('rosca');
     }
 
+    public function test_create_form_carries_the_join_url_for_the_duplicate_card(): void
+    {
+        Storage::fake('media');
+        $p = $this->line();
+        $template = route('purchases.items.join', ['purchaseItem' => '__ID__']);
+
+        $this->get(route('items.create', ['compra' => $p->id]))
+            ->assertOk()
+            ->assertSee('data-join-url-template="'.$template.'"', false);
+        $this->assertSame(route('purchases.items.join', $p), str_replace('__ID__', (string) $p->id, $template));
+    }
+
     public function test_store_links_and_copies_official_photo_when_none_uploaded(): void
     {
         Storage::fake('media');
