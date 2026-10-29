@@ -32,7 +32,7 @@ class PurchaseImporter
             'orders.*.total' => ['nullable', 'regex:/^\d+(\.\d{1,2})?$/'],
             'orders.*.currency' => ['nullable', 'string', 'max:10'],
             'orders.*.url' => ['nullable', 'string', 'max:2000'],
-            'orders.*.items' => ['present', 'array'],
+            'orders.*.items' => ['nullable', 'array'],
             'orders.*.items.*.title_truncated' => ['required', 'string'],
             'orders.*.items.*.variant' => ['nullable', 'string'],
             'orders.*.items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -55,16 +55,26 @@ class PurchaseImporter
                 $exists = $order->exists;
                 $status = PurchaseStatus::from($row['status']);
 
-                $order->fill([
-                    'ordered_at' => $row['ordered_at'] ?? null,
-                    'status' => $exists ? $order->status->advanceTo($status) : $status,
-                    'total_cents' => isset($row['total']) ? $this->toCents($row['total']) : null,
-                    'currency' => $row['currency'] ?? 'BRL',
-                    'url' => CleanUrl::strip($row['url'] ?? null),
-                ])->save();
+                // Keys absent from the payload keep the stored value (status-only updates).
+                $fields = ['status' => $exists ? $order->status->advanceTo($status) : $status];
+                if (array_key_exists('ordered_at', $row)) {
+                    $fields['ordered_at'] = $row['ordered_at'];
+                }
+                if (array_key_exists('total', $row)) {
+                    $fields['total_cents'] = $row['total'] === null ? null : $this->toCents($row['total']);
+                }
+                if (array_key_exists('currency', $row)) {
+                    $fields['currency'] = $row['currency'] ?? 'BRL';
+                } elseif (! $exists) {
+                    $fields['currency'] = 'BRL';
+                }
+                if (array_key_exists('url', $row)) {
+                    $fields['url'] = CleanUrl::strip($row['url']);
+                }
+                $order->fill($fields)->save();
                 $exists ? $updated++ : $created++;
 
-                foreach ($row['items'] as $line) {
+                foreach ($row['items'] ?? [] as $line) {
                     $variant = $line['variant'] ?? null;
                     $item = PurchaseItem::firstOrNew([
                         'purchase_order_id' => $order->id,

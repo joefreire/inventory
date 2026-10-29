@@ -156,4 +156,41 @@ class PurchaseImportTest extends TestCase
         $this->importer()->import($this->payload());
         Bus::assertNotDispatched(EnrichPurchaseItem::class);
     }
+
+    public function test_status_only_update_keeps_existing_data(): void
+    {
+        Bus::fake();
+        $this->importer()->import($this->payload());
+        $before = PurchaseOrder::where('number', '8215761587024729')->firstOrFail();
+
+        $result = $this->importer()->import([
+            'source' => 'aliexpress',
+            'orders' => [['number' => '8215761587024729', 'status' => 'delivered']],
+        ]);
+
+        $this->assertSame([], $result->errors);
+        $this->assertSame(1, $result->ordersUpdated);
+        $after = PurchaseOrder::where('number', '8215761587024729')->firstOrFail();
+        $this->assertSame(PurchaseStatus::Delivered, $after->status);
+        $this->assertSame($before->total_cents, $after->total_cents);
+        $this->assertEquals($before->ordered_at, $after->ordered_at);
+        $this->assertSame($before->url, $after->url);
+        $this->assertSame($before->currency, $after->currency);
+        $this->assertSame(2, $after->items()->count());
+        $this->assertSame(3, PurchaseItem::count());
+    }
+
+    public function test_status_only_payload_for_unknown_order_creates_it_without_items(): void
+    {
+        Bus::fake();
+
+        $result = $this->importer()->import([
+            'source' => 'aliexpress',
+            'orders' => [['number' => '999', 'status' => 'shipped']],
+        ]);
+
+        $this->assertSame(1, $result->ordersCreated);
+        $this->assertSame(0, $result->itemsCreated);
+        $this->assertSame(0, PurchaseOrder::where('number', '999')->firstOrFail()->items()->count());
+    }
 }
