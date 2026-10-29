@@ -83,4 +83,11 @@ test.describe('Purchases', () => {
     await page.getByRole('button', { name: 'Não guardo' }).first().click();
     await expect(page.locator('.toast-wrap')).toContainText('pendentes');
   });
+
+  test('proposals screen renders; no AI key, so none are seeded', async ({ page }) => {
+    await page.goto('/compras');
+    await expect(page.getByRole('button', { name: 'Ligar compras antigas às peças' })).toBeVisible();
+    await page.goto('/compras/propostas');
+    await expect(page.getByRole('heading', { name: 'Nenhuma proposta para revisar' })).toBeVisible();
+  });
 });

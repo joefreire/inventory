@@ -41,6 +41,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read Item|null $proposedItem
  *
  * @method static Builder<PurchaseItem> pending()
+ * @method static Builder<PurchaseItem> awaitingProposal()
+ * @method static Builder<PurchaseItem> withProposal()
  */
 class PurchaseItem extends Model implements HasMedia
 {
@@ -175,5 +177,29 @@ class PurchaseItem extends Model implements HasMedia
             ->whereNull('dismissed_at')
             ->where(fn (Builder $q) => $q->whereNull('is_part')->orWhere('is_part', true))
             ->whereHas('order', fn (Builder $q) => $q->where('status', PurchaseStatus::Delivered->value));
+    }
+
+    /**
+     * Enriched, unlinked, not dismissed, no proposal yet and none refused:
+     * candidates for the AI to match with an existing part.
+     *
+     * @param  Builder<PurchaseItem>  $query
+     * @return Builder<PurchaseItem>
+     */
+    public function scopeAwaitingProposal(Builder $query): Builder
+    {
+        return $query->whereNotNull('enriched_at')->whereNull('item_id')->whereNull('dismissed_at')
+            ->whereNull('proposal_rejected_at')->whereNull('proposed_item_id');
+    }
+
+    /**
+     * Lines with a proposal waiting for the owner.
+     *
+     * @param  Builder<PurchaseItem>  $query
+     * @return Builder<PurchaseItem>
+     */
+    public function scopeWithProposal(Builder $query): Builder
+    {
+        return $query->whereNull('item_id')->whereNotNull('proposed_item_id');
     }
 }

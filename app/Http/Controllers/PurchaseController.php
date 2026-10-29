@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportPurchasesRequest;
 use App\Http\Requests\JoinPurchaseItemRequest;
+use App\Http\Requests\ReviewProposalsRequest;
+use App\Jobs\ProposePurchaseLinks;
 use App\Models\Item;
 use App\Models\PurchaseItem;
 use App\Purchases\PurchaseImporter;
@@ -32,6 +34,7 @@ class PurchaseController extends Controller
             'lines' => $lines,
             'filter' => $filter,
             'pendingCount' => PurchaseItem::query()->pending()->count(),
+            'proposalCount' => PurchaseItem::query()->withProposal()->count(),
         ]);
     }
 
@@ -101,5 +104,46 @@ class PurchaseController extends Controller
         $linker->undismiss($purchaseItem);
 
         return back()->with('success', 'Voltou para os pendentes.');
+    }
+
+    public function generateProposals(): RedirectResponse
+    {
+        ProposePurchaseLinks::dispatch();
+
+        return back()->with('success', 'A IA está procurando as peças. As propostas aparecem aqui em instantes.');
+    }
+
+    public function proposals(): View
+    {
+        return view('purchases.proposals', [
+            'lines' => PurchaseItem::query()->withProposal()
+                ->with(['order', 'media', 'proposedItem.media'])
+                ->orderByDesc('proposal_probability')
+                ->limit(100)
+                ->get(),
+        ]);
+    }
+
+    public function reviewProposals(ReviewProposalsRequest $request, PurchaseLinker $linker): RedirectResponse
+    {
+        $rejected = $request->ids('recusar');
+        $confirmed = 0;
+        $skipped = 0;
+
+        $lines = PurchaseItem::query()->withProposal()
+            ->whereIn('id', array_merge($request->ids('confirmar'), $rejected))->get();
+        foreach ($lines as $line) {
+            if (in_array($line->id, $rejected, true)) {
+                $linker->rejectProposal($line);
+            } elseif ($linker->confirmProposal($line)) {
+                $confirmed++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        $message = "{$confirmed} ".($confirmed === 1 ? 'compra ligada' : 'compras ligadas').' às peças, sem mexer nas quantidades.';
+
+        return redirect()->route('purchases.proposals')->with('success', $skipped > 0 ? "{$message} {$skipped} já estavam ligadas." : $message);
     }
 }

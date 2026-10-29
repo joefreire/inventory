@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\EnrichPurchaseItem;
+use App\Jobs\ProposePurchaseLinks;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseOrder;
 use App\Models\User;
@@ -72,3 +73,11 @@ Artisan::command('compras:enriquecer {--falhas}', function () {
 
     return 0;
 })->purpose('Enfileira o enriquecimento por IA dos itens de compra pendentes');
+
+// Enfileira a IA para propor de qual peca do estoque e cada compra antiga.
+Artisan::command('compras:propor', function () {
+    ProposePurchaseLinks::dispatch();
+    $this->info('Busca de propostas na fila.');
+
+    return 0;
+})->purpose('Enfileira a ligacao por IA das compras antigas as pecas');

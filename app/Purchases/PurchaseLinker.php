@@ -60,6 +60,30 @@ class PurchaseLinker
     }
 
     /**
+     * Links the line to the part the AI proposed, never touching quantities.
+     * A line linked meanwhile (or without a proposal) is skipped: false.
+     */
+    public function confirmProposal(PurchaseItem $purchase): bool
+    {
+        $item = $purchase->proposedItem;
+        if ($item === null || ! $this->claim($purchase, $item)) {
+            return false;
+        }
+
+        $purchase->update(['proposed_item_id' => null, 'proposal_probability' => null]);
+
+        return true;
+    }
+
+    /**
+     * Refuses the proposal: the line is not proposed again.
+     */
+    public function rejectProposal(PurchaseItem $purchase): void
+    {
+        $purchase->update(['proposed_item_id' => null, 'proposal_probability' => null, 'proposal_rejected_at' => now()]);
+    }
+
+    /**
      * Conditional update: only the request that finds the line still unlinked wins.
      */
     private function claim(PurchaseItem $purchase, Item $item): bool

@@ -28,6 +28,16 @@
         @endforeach
     </div>
 
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        @if($proposalCount > 0)
+            <a href="{{ route('purchases.proposals') }}" class="btn btn-sm btn-primary"><i class="bi bi-link-45deg"></i> Revisar {{ $proposalCount }} {{ $proposalCount === 1 ? 'proposta' : 'propostas' }}</a>
+        @endif
+        <form action="{{ route('purchases.proposals.generate') }}" method="POST">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-quiet"><i class="bi bi-stars"></i> Ligar compras antigas às peças</button>
+        </form>
+    </div>
+
     <p class="small-muted mx-1 mb-2">
         {{ $lines->total() }} {{ $lines->total() === 1 ? 'item' : 'itens' }}
         @if($filter->search) para "{{ $filter->search }}" @endif
