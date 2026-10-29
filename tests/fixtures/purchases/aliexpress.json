@@ -1,0 +1,52 @@
+{
+  "source": "aliexpress",
+  "orders": [
+    {
+      "number": "8215761587024729",
+      "ordered_at": "2026-10-20",
+      "status": "shipped",
+      "total": "56.79",
+      "currency": "BRL",
+      "url": "https://www.aliexpress.com/p/order/detail.html?orderId=8215761587024729&tracelog=abc&rowan_id1=xyz&mem_info=qwe",
+      "buyer_name": "Fulano de Tal",
+      "phone": "(+55) 11 98888-7777",
+      "address": "Rua das Flores, 99",
+      "items": [
+        {
+          "title_truncated": "SONOFF ZBMINIR2 Interruptor I...",
+          "variant": "ZBMINIR2 1 PC",
+          "quantity": 1,
+          "image_url": "https://ae-pic-a1.aliexpress-media.com/kf/Sd0743a5e8fb24bee96a9859e995a85c26.jpg"
+        },
+        {
+          "title_truncated": "Parafuso M3 Aco Inox...",
+          "variant": "M3x10 100 PCS",
+          "quantity": 2,
+          "image_url": "https://ae-pic-a1.aliexpress-media.com/kf/Sparafuso.jpg"
+        }
+      ],
+      "recommended": [
+        {
+          "title_truncated": "Anuncio que nao e item",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "number": "8215761587024800",
+      "ordered_at": "2026-10-22",
+      "status": "awaiting",
+      "total": 12.5,
+      "currency": "BRL",
+      "url": "https://www.aliexpress.com/p/order/detail.html?orderId=8215761587024800",
+      "items": [
+        {
+          "title_truncated": "Cabo USB-C 1m...",
+          "variant": null,
+          "quantity": 3,
+          "image_url": null
+        }
+      ]
+    }
+  ]
+}
