@@ -17,8 +17,11 @@ final class LinkProposer
 {
     private const NONE = 'nenhuma';
 
-    /** Questions per decide() call (the model client splits larger sets itself). */
-    private const BATCH = 64;
+    /** Questions per decide() call: keeps each request under the model's input limit (HTTP 413). */
+    public const QUESTIONS_PER_CALL = 8;
+
+    /** Candidate parts listed per question (best name matches first). */
+    public const MAX_CANDIDATES = 20;
 
     public function __construct(
         private readonly DecisionModel $model,
@@ -28,7 +31,7 @@ final class LinkProposer
 
     /**
      * Records a proposal for each confident match; returns how many were recorded.
-     * Nothing is written when the model fails on any batch.
+     * Each batch is saved as soon as it is answered; a failing batch throws, keeping earlier batches.
      *
      * @param  Collection<int, PurchaseItem>  $purchaseItems
      *
@@ -36,9 +39,9 @@ final class LinkProposer
      */
     public function propose(Collection $purchaseItems): int
     {
-        $proposals = [];
+        $saved = 0;
 
-        foreach ($purchaseItems->filter(fn (PurchaseItem $p) => $this->eligible($p))->chunk(self::BATCH) as $chunk) {
+        foreach ($purchaseItems->filter(fn (PurchaseItem $p) => $this->eligible($p))->chunk(self::QUESTIONS_PER_CALL) as $chunk) {
             $questions = [];
             foreach ($chunk as $purchase) {
                 $question = $this->question($purchase);
@@ -52,6 +55,7 @@ final class LinkProposer
 
             $answers = $this->model->decide('Compras antigas a ligar às peças do estoque.', $questions);
 
+            $proposals = [];
             foreach ($chunk as $purchase) {
                 $answer = $answers['p'.$purchase->id] ?? null;
                 $choice = (string) ($answer['choice'] ?? self::NONE);
@@ -63,12 +67,11 @@ final class LinkProposer
                     $proposals[$purchase->id] = [$itemId, round($probability, 3)];
                 }
             }
-        }
 
-        $saved = 0;
-        foreach ($proposals as $id => [$itemId, $probability]) {
-            $saved += PurchaseItem::whereKey($id)->whereNull('item_id')->whereNull('proposal_rejected_at')
-                ->update(['proposed_item_id' => $itemId, 'proposal_probability' => $probability]);
+            foreach ($proposals as $id => [$itemId, $probability]) {
+                $saved += PurchaseItem::whereKey($id)->whereNull('item_id')->whereNull('proposal_rejected_at')
+                    ->update(['proposed_item_id' => $itemId, 'proposal_probability' => $probability]);
+            }
         }
 
         return $saved;
@@ -85,14 +88,18 @@ final class LinkProposer
      */
     private function question(PurchaseItem $purchase): ?array
     {
-        $candidates = $this->finder->for($purchase->displayName(), $this->model->maxChoiceOptions() - 1);
+        $name = $purchase->displayName();
+        $words = collect(preg_split('/[^\pL\pN]+/u', Str::lower($name)) ?: [])->filter(fn ($w) => mb_strlen($w) >= 3)->unique();
+        $candidates = $this->finder->for($name, $this->model->maxChoiceOptions() - 1)
+            ->sortByDesc(fn ($item) => $words->filter(fn ($w) => str_contains(Str::lower($item->name.' '.$item->description), $w))->count())
+            ->take(min(self::MAX_CANDIDATES, $this->model->maxChoiceOptions() - 1));
         if ($candidates->isEmpty()) {
             return null;
         }
 
         $criteria = [];
         foreach ($candidates as $item) {
-            $criteria['i'.$item->id] = Str::limit($item->name.($item->description ? " - {$item->description}" : ''), 300);
+            $criteria['i'.$item->id] = Str::limit($item->name.($item->description ? ' - '.Str::limit($item->description, 80) : ''), 120);
         }
         $criteria[self::NONE] = 'Nenhuma: não é nenhuma destas peças';
 

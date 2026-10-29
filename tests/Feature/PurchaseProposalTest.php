@@ -11,6 +11,8 @@ use App\Models\PurchaseOrder;
 use App\Purchases\LinkProposer;
 use App\Purchases\PurchaseStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -184,6 +186,60 @@ class PurchaseProposalTest extends TestCase
             $this->assertNull($p->fresh()->proposed_item_id);
             $this->assertNull($p->fresh()->proposal_rejected_at);
         }
+    }
+
+    public function test_requests_are_small_batches_with_capped_candidates(): void
+    {
+        for ($i = 1; $i <= 50; $i++) {
+            Item::create(['name' => "Parafuso M3 variante {$i}", 'description' => str_repeat('x', 400), 'quantity' => 1]);
+        }
+        for ($i = 0; $i < 30; $i++) {
+            $this->line();
+        }
+        config(['ai.ollama.api_key' => 'k', 'ai.ollama.base_url' => 'https://ollama.test', 'ai.models.decision' => 'clef']);
+        Http::fake(['ollama.test/v1/systemone' => fn (Request $r) => Http::response(['answers' => collect($r['questions'])
+            ->map(fn ($q) => ['type' => 'choice', 'choice' => 'nenhuma', 'probabilities' => ['nenhuma' => 0.9]])->all()])]);
+
+        app(LinkProposer::class)->propose(PurchaseItem::all());
+
+        $sent = 0;
+        Http::assertSent(function (Request $r) use (&$sent) {
+            $sent++;
+            $this->assertLessThanOrEqual(LinkProposer::QUESTIONS_PER_CALL, count($r['questions']));
+            foreach ($r['questions'] as $q) {
+                $this->assertLessThanOrEqual(LinkProposer::MAX_CANDIDATES + 1, count($q['criteria']));
+            }
+
+            return true;
+        });
+        $this->assertGreaterThanOrEqual(4, $sent);
+    }
+
+    public function test_failed_batch_keeps_earlier_proposals_and_fails_the_job(): void
+    {
+        $item = Item::create(['name' => 'Parafuso M3', 'quantity' => 7]);
+        for ($i = 0; $i < 30; $i++) {
+            $this->line();
+        }
+        $calls = 0;
+        config(['ai.ollama.api_key' => 'k', 'ai.ollama.base_url' => 'https://ollama.test', 'ai.models.decision' => 'clef']);
+        Http::fake(['ollama.test/v1/systemone' => function (Request $r) use (&$calls, $item) {
+            if (++$calls >= 2) {
+                return Http::response(['error' => 'The estimated number of input'], 413);
+            }
+
+            return Http::response(['answers' => collect($r['questions'])
+                ->map(fn ($q) => ['type' => 'choice', 'choice' => "i{$item->id}", 'probabilities' => ["i{$item->id}" => 0.95]])->all()]);
+        }]);
+
+        try {
+            (new ProposePurchaseLinks)->handle(app(LinkProposer::class));
+            $this->fail('job should fail');
+        } catch (AiException $e) {
+            $this->assertStringContainsString('413', $e->getMessage());
+        }
+
+        $this->assertSame(LinkProposer::QUESTIONS_PER_CALL, PurchaseItem::whereNotNull('proposed_item_id')->count());
     }
 
     public function test_generate_queues_job_and_screens_render(): void
