@@ -113,6 +113,23 @@
         </div>
     @endif
 
+    @if($item->purchaseItems->isNotEmpty())
+        <h3 class="group-title">Compras</h3>
+        <div class="rows">
+            @foreach($item->purchaseItems as $purchase)
+                @php $order = $purchase->order; @endphp
+                <div class="row-item">
+                    <span class="grow">
+                        <span class="name">{{ $order->source === 'aliexpress' ? 'AliExpress' : ucfirst($order->source) }}@if($order->ordered_at) · {{ $order->ordered_at->format('d/m/Y') }}@endif · pedido {{ $order->number }} · x{{ $purchase->quantity }}</span>
+                        @if($order->url)
+                            <a href="{{ $order->url }}" target="_blank" rel="noopener" class="small-muted">Abrir pedido na loja</a>
+                        @endif
+                    </span>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
     @if($item->notes)
         <h3 class="group-title">Notas</h3>
         <p class="mx-1" style="white-space: pre-line; max-width: 62ch">{{ $item->notes }}</p>

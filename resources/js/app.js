@@ -22,6 +22,7 @@ const pages = {
     'item-show': () => import('./pages/item-show'),
     'item-ask': () => import('./pages/item-ask'),
     'location-show': () => import('./pages/location-show'),
+    purchases: () => import('./pages/purchases'),
     'tag-form': () => import('./pages/tag-form'),
 };
 

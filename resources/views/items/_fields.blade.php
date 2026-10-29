@@ -1,6 +1,7 @@
 {{-- Campos da peca, usados no cadastro e na edicao. Espera $locations, $tags e, na edicao, $item. --}}
 @php
     $item = $item ?? null;
+    $purchase = $purchase ?? null; // bought line this part is registered from (create only)
     $categoryOptions = config('ai.categories');
     $currentCategory = old('category', $item?->category);
 @endphp
@@ -8,7 +9,7 @@
 <div class="mb-3">
     <label for="name" class="form-label">Nome</label>
     <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name"
-           value="{{ old('name', $item?->name) }}" required autocomplete="off" placeholder="Ex.: Resistor 10k 1/4W">
+           value="{{ old('name', $item?->name ?? $purchase?->displayName()) }}" required autocomplete="off" placeholder="Ex.: Resistor 10k 1/4W">
     @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 
@@ -29,7 +30,7 @@
     <div class="col-5">
         <label for="quantity" class="form-label">Quantidade</label>
         <input type="number" class="form-control @error('quantity') is-invalid @enderror" id="quantity" name="quantity"
-               value="{{ old('quantity', $item?->quantity ?? 1) }}" min="{{ $item ? 0 : 1 }}" inputmode="numeric" pattern="[0-9]*">
+               value="{{ old('quantity', $item?->quantity ?? $purchase?->suggestedQuantity() ?? 1) }}" min="{{ $item ? 0 : 1 }}" inputmode="numeric" pattern="[0-9]*">
         @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 </div>
@@ -51,7 +52,7 @@
 <div class="mb-3">
     <label for="description" class="form-label">O que é</label>
     <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description"
-              rows="3" placeholder="Para que serve, de onde veio...">{{ old('description', $item?->description) }}</textarea>
+              rows="3" placeholder="Para que serve, de onde veio...">{{ old('description', $item?->description ?? $purchase?->description) }}</textarea>
     @error('description')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 

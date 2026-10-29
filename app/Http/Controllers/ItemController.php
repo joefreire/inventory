@@ -12,7 +12,9 @@ use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Models\Item;
 use App\Models\Location;
+use App\Models\PurchaseItem;
 use App\Models\Tag;
+use App\Purchases\PurchaseLinker;
 use App\Queries\ItemFilter;
 use App\Services\ItemService;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +31,7 @@ class ItemController extends Controller
 {
     private const PER_PAGE = 24;
 
-    public function __construct(private readonly ItemService $items) {}
+    public function __construct(private readonly ItemService $items, private readonly PurchaseLinker $purchases) {}
 
     public function index(Request $request): View
     {
@@ -48,12 +50,21 @@ class ItemController extends Controller
 
     public function create(Request $request): View
     {
-        return view('items.create', ['locationId' => $request->integer('location_id') ?: null]);
+        $purchase = $request->integer('compra') ? PurchaseItem::with(['order', 'media'])->find($request->integer('compra')) : null;
+
+        return view('items.create', [
+            'locationId' => $request->integer('location_id') ?: null,
+            'purchase' => $purchase,
+        ]);
     }
 
     public function store(StoreItemRequest $request): RedirectResponse
     {
         $item = $this->items->create($request->itemData(), $request->tagNames(), $request->photoFiles(StoreItemRequest::MAX_PHOTOS));
+
+        if (($purchase = $request->purchaseItem()) !== null) {
+            $this->purchases->linkNew($purchase, $item);
+        }
 
         // "Salvar e próxima": back to the form in the same box (registering in sequence)
         if ($request->boolean('proxima')) {
@@ -67,7 +78,7 @@ class ItemController extends Controller
 
     public function show(Item $item): View
     {
-        return view('items.show', ['item' => $item->load(['location', 'tags', 'media'])]);
+        return view('items.show', ['item' => $item->load(['location', 'tags', 'media', 'purchaseItems.order'])]);
     }
 
     public function edit(Item $item): View

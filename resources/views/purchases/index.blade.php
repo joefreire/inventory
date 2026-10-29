@@ -2,13 +2,15 @@
 
 @section('title', 'Compras')
 @section('back', route('items.index'))
+@section('page', 'purchases')
 
 @section('top-actions')
     <a href="{{ route('purchases.import') }}" class="icon-btn" aria-label="Importar compras"><i class="bi bi-upload"></i></a>
+
 @endsection
 
 @section('content')
-<div class="page">
+<div class="page" id="purchasesPage" data-parts-url="{{ route('purchases.parts') }}">
     <form class="search-bar" action="{{ route('purchases.index') }}" method="GET" role="search">
         <input type="hidden" name="mostrar" value="{{ $filter->show }}">
         <div class="search-field">
@@ -50,5 +52,31 @@
             @endif
         </div>
     @endif
+</div>
+{{-- Juntar a uma peca que ja existe --}}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="juntar" aria-labelledby="juntarTitulo">
+    <div class="grabber"></div>
+    <div class="offcanvas-header pb-1">
+        <h2 class="h3 mb-0" id="juntarTitulo">Juntar a qual peça?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div id="joinSearchStep">
+            <div class="px-3 pb-2">
+                <input type="search" class="form-control" id="joinSearch" placeholder="Buscar peça..." autocomplete="off" aria-label="Buscar peça">
+            </div>
+            <div id="joinResults"></div>
+        </div>
+        <form method="POST" id="joinForm" class="px-3 d-none">
+            @csrf
+            <input type="hidden" name="item_id" id="joinItemId">
+            <p id="joinAsk" class="mb-3"></p>
+            <div class="d-grid gap-2 pb-3">
+                <button type="submit" name="somar" value="1" class="btn btn-primary">Somar</button>
+                <button type="submit" name="somar" value="0" class="btn btn-quiet">Só ligar, sem somar</button>
+                <button type="button" class="btn btn-link" id="joinBack">Escolher outra peça</button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

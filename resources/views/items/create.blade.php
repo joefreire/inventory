@@ -11,13 +11,29 @@
           data-analyze-url="{{ route('items.analyze') }}" data-max-ai-photos="{{ \App\Ai\ItemAdvisor::MAX_PHOTOS }}">
         @csrf
 
+        @if($purchase)
+            @php $official = $purchase->getFirstMedia('photo'); @endphp
+            <input type="hidden" name="purchase_item_id" value="{{ $purchase->id }}">
+            <div class="panel mb-3">
+                <div class="d-flex gap-3 align-items-center">
+                    @if($official)
+                        <img src="{{ route('media.show', [$official, 'thumb']) }}" class="thumb" alt="Foto do anúncio" width="64" height="64">
+                    @endif
+                    <div class="small-muted">
+                        @if($official)<div>Foto do anúncio (usada se você não tirar outra)</div>@endif
+                        <div>Da compra {{ $purchase->order->number }}, x{{ $purchase->quantity }}@if(($purchase->pack_quantity ?? 1) > 1) de {{ $purchase->pack_quantity }}@endif</div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Camera primeiro: cada foto nova ja dispara a IA com todas as fotos --}}
         @include('items._photos')
 
         <div id="aiArea" class="mb-3"></div>
 
         <input type="hidden" name="ai_description" id="ai_description" value="{{ old('ai_description') }}">
-        <input type="hidden" name="ai_metadata" id="ai_metadata" value="{{ old('ai_metadata') }}">
+        <input type="hidden" name="ai_metadata" id="ai_metadata" value="{{ old('ai_metadata', $purchase && $purchase->specs ? json_encode(['specs' => $purchase->specs], JSON_UNESCAPED_UNICODE) : '') }}">
 
         @include('items._fields')
 

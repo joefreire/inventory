@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\HandlesPhotoUploads;
+use App\Models\PurchaseItem;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -42,6 +43,7 @@ class StoreItemRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'tags' => ['nullable', 'string', 'max:500'],
             'ai_metadata' => ['nullable', 'json', 'max:10000'],
+            'purchase_item_id' => ['nullable', 'integer', 'exists:purchase_items,id'],
         ] + $this->photoRules(self::MAX_PHOTOS);
     }
 
@@ -65,6 +67,16 @@ class StoreItemRequest extends FormRequest
         }
 
         return $data;
+    }
+
+    /**
+     * Bought line this part is being registered from, if any.
+     */
+    public function purchaseItem(): ?PurchaseItem
+    {
+        $id = $this->validated('purchase_item_id');
+
+        return $id ? PurchaseItem::find($id) : null;
     }
 
     /**

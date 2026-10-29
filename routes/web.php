@@ -29,6 +29,10 @@ Route::middleware('auth')->group(function () {
     Route::get('compras', [PurchaseController::class, 'index'])->name('purchases.index');
     Route::get('compras/importar', [PurchaseController::class, 'import'])->name('purchases.import');
     Route::post('compras/importar', [PurchaseController::class, 'storeImport'])->name('purchases.import.store');
+    Route::get('compras/pecas', [PurchaseController::class, 'parts'])->name('purchases.parts');
+    Route::post('compras/itens/{purchaseItem}/juntar', [PurchaseController::class, 'join'])->name('purchases.items.join');
+    Route::patch('compras/itens/{purchaseItem}/dispensar', [PurchaseController::class, 'dismiss'])->name('purchases.items.dismiss');
+    Route::patch('compras/itens/{purchaseItem}/retomar', [PurchaseController::class, 'undismiss'])->name('purchases.items.undismiss');
 
     Route::resource('tags', TagController::class);
 
