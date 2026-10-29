@@ -17,3 +17,11 @@
 - E2E purchase items are unenriched (pack_quantity null), so the join confirmation says "Somar 2 unidades".
 - Added extras beyond brief: undismiss route + "Voltar a pendente" button, "Já está no estoque" link on linked rows, parts search endpoint.
 - Linking after create is outside ItemService's transaction (photo copy failure would leave item created and purchase linked without photo).
+
+## Fix round 1
+- PurchaseLinker: link is a conditional `UPDATE ... WHERE item_id IS NULL` (claim); join runs claim + adjustQuantity in one transaction, losing claim throws ValidationException on `item_id` ("Essa compra já está ligada a uma peça."). Dismissed lines can still be linked (dismissed_at cleared).
+- StoreItemRequest: `Rule::exists('purchase_items','id')->whereNull('item_id')`. `items/create?compra=` for a linked line redirects to its part with flash error (same text).
+- linkNew: photo copy wrapped in try/catch + report(); link and part kept.
+- Purchases list shows the join validation error.
+- New tests (5): join twice, join moved line, store rejects linked, create redirects for linked, dismissed can be joined.
+- `php8.4 artisan test --filter=PurchaseLinkTest`: 14 passed. `composer check`: exit 0, 157 tests, PHPStan OK. `npm run e2e`: 48 passed.

@@ -43,7 +43,7 @@ class StoreItemRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'tags' => ['nullable', 'string', 'max:500'],
             'ai_metadata' => ['nullable', 'json', 'max:10000'],
-            'purchase_item_id' => ['nullable', 'integer', 'exists:purchase_items,id'],
+            'purchase_item_id' => ['nullable', 'integer', Rule::exists('purchase_items', 'id')->whereNull('item_id')],
         ] + $this->photoRules(self::MAX_PHOTOS);
     }
 

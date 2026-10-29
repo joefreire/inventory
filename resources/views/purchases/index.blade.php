@@ -11,6 +11,7 @@
 
 @section('content')
 <div class="page" id="purchasesPage" data-parts-url="{{ route('purchases.parts') }}">
+    @error('item_id')<div class="alert alert-danger" role="alert">{{ $message }}</div>@enderror
     <form class="search-bar" action="{{ route('purchases.index') }}" method="GET" role="search">
         <input type="hidden" name="mostrar" value="{{ $filter->show }}">
         <div class="search-field">

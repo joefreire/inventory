@@ -153,4 +153,61 @@ class PurchaseLinkTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Parafuso M3');
     }
+
+    public function test_join_twice_does_not_add_quantity_twice(): void
+    {
+        $item = Item::create(['name' => 'Parafuso', 'quantity' => 5]);
+        $p = $this->line();
+
+        $this->post(route('purchases.items.join', $p), ['item_id' => $item->id, 'somar' => 1])->assertRedirect();
+        $this->post(route('purchases.items.join', $p), ['item_id' => $item->id, 'somar' => 1])->assertSessionHasErrors('item_id');
+
+        $this->assertSame(205, $item->fresh()->quantity);
+    }
+
+    public function test_join_cannot_move_line_linked_to_another_part(): void
+    {
+        $a = Item::create(['name' => 'A', 'quantity' => 1]);
+        $b = Item::create(['name' => 'B', 'quantity' => 1]);
+        $p = $this->line(['item_id' => $a->id]);
+
+        $this->post(route('purchases.items.join', $p), ['item_id' => $b->id, 'somar' => 1])->assertSessionHasErrors('item_id');
+
+        $this->assertSame($a->id, $p->fresh()->item_id);
+        $this->assertSame(1, $b->fresh()->quantity);
+    }
+
+    public function test_store_rejects_purchase_item_already_linked(): void
+    {
+        $a = Item::create(['name' => 'A', 'quantity' => 1]);
+        $p = $this->line(['item_id' => $a->id]);
+
+        $this->post(route('items.store'), ['name' => 'Outra', 'purchase_item_id' => $p->id])->assertSessionHasErrors('purchase_item_id');
+
+        $this->assertSame($a->id, $p->fresh()->item_id);
+        $this->assertDatabaseMissing('items', ['name' => 'Outra']);
+    }
+
+    public function test_create_for_linked_purchase_redirects_to_its_part(): void
+    {
+        $a = Item::create(['name' => 'A', 'quantity' => 1]);
+        $p = $this->line(['item_id' => $a->id]);
+
+        $this->get(route('items.create', ['compra' => $p->id]))
+            ->assertRedirect(route('items.show', $a))
+            ->assertSessionHas('error', 'Essa compra já está ligada a uma peça.');
+    }
+
+    public function test_dismissed_line_can_still_be_joined(): void
+    {
+        $item = Item::create(['name' => 'Parafuso', 'quantity' => 5]);
+        $p = $this->line(['dismissed_at' => now()]);
+
+        $this->post(route('purchases.items.join', $p), ['item_id' => $item->id, 'somar' => 1])->assertRedirect();
+
+        $p->refresh();
+        $this->assertSame($item->id, $p->item_id);
+        $this->assertNull($p->dismissed_at);
+        $this->assertSame(205, $item->fresh()->quantity);
+    }
 }

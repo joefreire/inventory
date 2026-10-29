@@ -48,9 +48,13 @@ class ItemController extends Controller
         ]);
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $purchase = $request->integer('compra') ? PurchaseItem::with(['order', 'media'])->find($request->integer('compra')) : null;
+
+        if ($purchase?->item_id !== null) {
+            return redirect()->route('items.show', $purchase->item_id)->with('error', 'Essa compra já está ligada a uma peça.');
+        }
 
         return view('items.create', [
             'locationId' => $request->integer('location_id') ?: null,
