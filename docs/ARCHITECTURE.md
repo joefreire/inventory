@@ -48,6 +48,41 @@ Trocar de provedor = outra classe que implementa o contrato + o bind em
 `PartDecision`, listada em `config/ai.php` → `decisions`. Vai na mesma chamada,
 sem custo de ida e volta extra, e aparece na resposta da análise com a chave `key()`.
 
+## Compras (app/Purchases)
+
+Pedidos do AliExpress viram itens de compra que ajudam a cadastrar peças. O app
+**nunca acessa o Gmail**: quem lê os e-mails é a skill `/importar-pedidos` (homelab).
+
+```
+skill /importar-pedidos (Gmail, manual) ─► JSON ─► compras:importar (SSH) ou upload em /compras/importar
+   └► PurchaseImporter ─► PurchaseOrder + PurchaseItem ─► job EnrichPurchaseItem (fila)
+        └► telas: pendentes ─► cadastrar | juntar | dispensar (PurchaseLinker)
+             └► PurchaseDecision (análise da peça)      LinkProposer (lote, compras antigas)
+```
+
+- **Importação.** `PurchaseImporter` só lê campos da whitelist (endereço, telefone e
+  propaganda nunca entram), é idempotente (loja + número do pedido, item dentro do
+  pedido) e o status só anda para a frente (`PurchaseStatus`). `CleanUrl` tira os
+  parâmetros de rastreamento. `compras:pedidos` diz à skill o que já existe.
+- **Enriquecimento.** `EnrichPurchaseItem` (3 tentativas, 300 s) baixa a foto oficial
+  só de `*.aliexpress-media.com` e `*.alicdn.com` (`config/ai.php` → `purchase_image_hosts`),
+  só HTTPS, sem seguir redirect, e confere que o corpo é imagem. A foto vai para o disco
+  privado `media`. O modelo de visão recebe o preview JPEG de 800 px; sem foto, completa
+  só pelo texto. Falha grava `enrichment_error` e o item não conta como enriquecido
+  (`compras:enriquecer --falhas` tenta de novo).
+- **Telas.** `/compras` lista os pendentes (entregues e ainda sem peça). Por item:
+  cadastrar (formulário normal preenchido), juntar a peça existente (soma a quantidade)
+  ou dispensar/retomar. `PurchaseLinker` faz o vínculo com claim atômico: uma compra só
+  liga uma vez e a quantidade não soma em dobro.
+- **Peça solta.** `Decisions\PurchaseDecision` ("veio de qual compra?") entra na análise
+  da foto como as outras decisões; só propõe acima do limite de confiança.
+- **Compras antigas.** `LinkProposer` (job `ProposePurchaseLinks`, 600 s) propõe em lote
+  "item de compra → peça". Confirmar **nunca muda a quantidade**: a peça já foi contada
+  no cadastro. Só propõe ligar o que é peça/ferramenta.
+- **Fila.** Worker `inventario-queue` (`deploy/inventario-queue.service`, `--timeout=300`).
+  O `.env` de produção precisa de `DB_QUEUE_RETRY_AFTER=660`, acima do maior timeout de
+  job; senão o job volta para a fila enquanto roda e a IA é chamada duas vezes.
+
 ## Segurança
 
 | Ameaça | Proteção |
@@ -59,6 +94,8 @@ sem custo de ida e volta extra, e aparece na resposta da análise com a chave `k
 | Clickjacking, sniffing | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, HSTS em HTTPS (`SecurityHeaders`) |
 | Upload malicioso | só jpg/png/webp de verdade (HEIC recusado já no navegador) (conteúdo, não extensão), 12 MB, 8000 px; sem SVG |
 | Custo/abuso da IA | `throttle:ai` (20/min por usuário, `AI_RATE_LIMIT`) |
+| SSRF no download da foto da compra | só HTTPS, host na lista (`*.aliexpress-media.com`, `*.alicdn.com`), sem redirect, timeout 20 s, 12 MB, corpo conferido como imagem |
+| Dados pessoais nas compras | `PurchaseImporter` usa whitelist: endereço, telefone e destinatário nunca são gravados; links sem parâmetros de rastreamento |
 | Sessão | cookie seguro, `SameSite=lax`, regenerada no login |
 | Dependências | `composer audit` e `npm audit` zerados (rodar `composer audit-all`) |
 

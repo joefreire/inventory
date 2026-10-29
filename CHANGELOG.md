@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-29
+
+### Added
+
+- Area "Compras": pedidos do AliExpress importados pela skill `/importar-pedidos`
+  (le o Gmail fora do app) via `compras:importar` ou upload em `/compras/importar`.
+  Importacao idempotente, status so avanca; endereco e telefone nunca sao gravados.
+- Enriquecimento por IA em fila (`EnrichPurchaseItem`): nome completo, specs e
+  pacote a partir da foto oficial (baixada so de hosts permitidos, HTTPS, sem
+  redirect) e do nome cortado; sem foto, so pelo texto.
+- Lista de pendentes, com cadastrar peca, juntar a peca existente e dispensar.
+- `PurchaseDecision`: o cadastro sugere de qual compra veio a peca.
+- Ligacao em lote das compras antigas as pecas (`LinkProposer`); confirmar nao
+  muda a quantidade.
+- Comandos `compras:pedidos`, `compras:enriquecer` e `compras:propor`.
+- Worker `inventario-queue` (`deploy/inventario-queue.service`).
+- Botao "Sair" e acesso a Tags no menu da tela de pecas.
+
+### Changed
+
+- `.env` de producao precisa de `DB_QUEUE_RETRY_AFTER=660`.
+- Testes E2E reescritos para a interface nova.
+- Refactor: IA modular, HTTP enxuto, seguranca e front em modulos.
+
+### Fixed
+
+- Fotos sem arquivo orfao, IA que falha calada e HEIC recusado com mensagem honesta.
+- Categoria fora da config nao trava a edicao; busca ve mudanca de inventario.
+- Compras: ligar so uma vez e sem somar em dobro; atualizacao so de status nao apaga
+  dados do pedido; IA da compra com a foto de 800 px; nao propor ligar o que nao e peca.
+- `symfony/mime` 7.4.22 (CVE-2026-45070).
+
 ## [2.0.0] - 2026-10-25
 
 ### Changed
