@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -90,6 +91,16 @@ class Item extends Model implements HasMedia
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+
+    /**
+     * Get the purchase lines linked to this item.
+     *
+     * @return HasMany<PurchaseItem, $this>
+     */
+    public function purchaseItems(): HasMany
+    {
+        return $this->hasMany(PurchaseItem::class);
     }
 
     /**
